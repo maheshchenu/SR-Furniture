@@ -25,51 +25,46 @@ import { getAdminToken } from "./services/api";
 function ProtectedRoute() {
   const token = getAdminToken();
 
-  return token ? <Outlet /> : <Navigate to="/login" replace />;
+  return token ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function App() {
+  const isAuthenticated = Boolean(getAdminToken());
+
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* Admin Login */}
+        {/* Root URL: Login or Dashboard */}
         <Route
-          path="/login"
+          path="/"
           element={
-            getAdminToken() ? (
-              <Navigate to="/" replace />
-            ) : (
-              <AdminLogin />
-            )
+            isAuthenticated ? <DashboardLayout /> : <AdminLogin />
           }
-        />
+        >
+          <Route index element={<Dashboard />} />
 
-        {/* Protected Dashboard */}
-        <Route element={<ProtectedRoute />}>
-          <Route element={<DashboardLayout />}>
-
-            <Route path="/" element={<Dashboard />} />
-
-            <Route path="/categories" element={<Categories />} />
-
-            <Route path="/products" element={<Products />} />
-
-            <Route path="/sales" element={<Sales />} />
-
-            <Route path="/expenses" element={<Expenses />} />
-
-            <Route path="/reports" element={<Reports />} />
-
-            <Route path="/customer-dues" element={<CustomerDues />} />
-
+          <Route
+            element={<ProtectedRoute />}
+          >
+            <Route path="categories" element={<Categories />} />
+            <Route path="products" element={<Products />} />
+            <Route path="sales" element={<Sales />} />
+            <Route path="expenses" element={<Expenses />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="customer-dues" element={<CustomerDues />} />
             <Route
-              path="/manufacturer-payments"
+              path="manufacturer-payments"
               element={<ManufacturerPayments />}
             />
-
           </Route>
         </Route>
+
+        {/* Old Login URL redirects to Root */}
+        <Route
+          path="/login"
+          element={<Navigate to="/" replace />}
+        />
 
         {/* Invalid URL */}
         <Route
