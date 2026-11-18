@@ -4,11 +4,12 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
 } from "react";
 
-const CategoryContext = createContext();
+import api from "../services/api";
 
-const API_URL = "http://localhost:5000/api/categories";
+const CategoryContext = createContext();
 
 export function CategoryProvider({ children }) {
   const [categories, setCategories] = useState([]);
@@ -16,52 +17,50 @@ export function CategoryProvider({ children }) {
   const [error, setError] = useState("");
 
   // Fetch categories from MongoDB
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch(API_URL);
-      const data = await response.json();
+      const response = await api.get("/api/categories");
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to fetch categories");
-      }
+      const data = response.data;
+
+      const categoryList = data.categories || [];
 
       setCategories(
-        data.categories.map((category) => ({
+        categoryList.map((category) => ({
           ...category,
           id: category._id,
         }))
       );
+
     } catch (error) {
       console.error("Fetch Categories Error:", error);
-      setError(error.message);
+
+      setError(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch categories"
+      );
+
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   // Add category to MongoDB
   const addCategory = async (name) => {
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name }),
+      const response = await api.post("/api/categories", {
+        name,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to add category");
-      }
+      const data = response.data;
 
       const newCategory = {
         ...data.category,
@@ -71,33 +70,37 @@ export function CategoryProvider({ children }) {
       setCategories((prev) => [...prev, newCategory]);
 
       return newCategory;
+
     } catch (error) {
       console.error("Add Category Error:", error);
-      throw error;
+
+      throw new Error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to add category"
+      );
     }
   };
 
   // Delete category from MongoDB
   const deleteCategory = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete category");
-      }
+      await api.delete(`/api/categories/${id}`);
 
       setCategories((prev) =>
         prev.filter((category) => category.id !== id)
       );
 
       return true;
+
     } catch (error) {
       console.error("Delete Category Error:", error);
-      throw error;
+
+      throw new Error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete category"
+      );
     }
   };
 

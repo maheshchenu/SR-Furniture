@@ -8,9 +8,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useProducts } from "../context/ProductContext";
+import api from "../services/api";
 import logo from "../assets/logo2.png";
 
-const API_URL = "http://localhost:5000/api/expenses";
+const API_URL = "/api/expenses";
 
 const getTodayDate = () => {
   const today = new Date();
@@ -21,7 +22,6 @@ const getTodayDate = () => {
     .slice(0, 10);
 };
 
-// Convert MongoDB ISO date into YYYY-MM-DD
 const getDateOnly = (date) => {
   if (!date) return "";
 
@@ -39,10 +39,6 @@ const getDateOnly = (date) => {
     .toISOString()
     .slice(0, 10);
 };
-
-/* ------------------------------------------------------------------ */
-/* Reusable Tailwind class sets (page-specific, no global CSS)         */
-/* ------------------------------------------------------------------ */
 
 const inputClass =
   "w-full min-h-[48px] rounded-xl border border-[#E6DEC3] bg-white px-4 py-3 text-sm font-medium text-[#001F0B] shadow-[inset_0_1px_2px_rgba(0,31,11,0.04)] outline-none transition duration-200 [color-scheme:light] placeholder:text-[#9AA59C] hover:border-[#DFA900]/60 focus:border-[#DFA900] focus:ring-4 focus:ring-[#DFA900]/20 disabled:cursor-not-allowed disabled:opacity-50";
@@ -98,10 +94,6 @@ const METHOD_STYLES = {
 const getMethodStyle = (method) =>
   METHOD_STYLES[method] || METHOD_STYLES.Other;
 
-/* ------------------------------------------------------------------ */
-/* Icons                                                               */
-/* ------------------------------------------------------------------ */
-
 const ICONS = {
   rupee: "M6 3h12M6 8h12M6 13h3c4 0 6-2 6-5M9 13l7 8",
   calendar:
@@ -115,7 +107,8 @@ const ICONS = {
   close: "M6 6l12 12M18 6 6 18",
   check: "m5 12.5 4.5 4.5L19 7.5",
   chevron: "m6 9 6 6 6-6",
-  refresh: "M20 11a8 8 0 00-14.9-3M4 4v4h4M4 13a8 8 0 0014.9 3M20 20v-4h-4",
+  refresh:
+    "M20 11a8 8 0 00-14.9-3M4 4v4h4M4 13a8 8 0 0014.9 3M20 20v-4h-4",
   alert: "M12 3l10 18H2L12 3zM12 10v5M12 18h.01",
   sun: "M12 16a4 4 0 100-8 4 4 0 000 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
 };
@@ -144,11 +137,6 @@ function Spinner({ className = "h-4 w-4" }) {
     />
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Premium dropdown (portal based, never clipped)                      */
-/* Takes <option> children and calls onChange({ target: { value } }). */
-/* ------------------------------------------------------------------ */
 
 const textOf = (node) => {
   if (node === null || node === undefined || typeof node === "boolean") {
@@ -375,10 +363,10 @@ function Expenses() {
     try {
       setError("");
 
-      const response = await fetch(API_URL);
-      const data = await response.json();
+      const response = await api.get(API_URL);
+      const data = response.data;
 
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || "Failed to fetch expenses.");
       }
 
@@ -390,7 +378,11 @@ function Expenses() {
         }))
       );
     } catch (err) {
-      setError(err.message || "Unable to load expenses.");
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to load expenses."
+      );
     } finally {
       setLoading(false);
     }
@@ -414,8 +406,7 @@ function Expenses() {
   // MONTHLY EXPENSES
   const monthlyExpense = expenses
     .filter(
-      (expense) =>
-        getDateOnly(expense.date).slice(0, 7) === currentMonth
+      (expense) => getDateOnly(expense.date).slice(0, 7) === currentMonth
     )
     .reduce(
       (total, expense) => total + Number(expense.amount || 0),
@@ -462,7 +453,7 @@ function Expenses() {
     0
   );
 
-  // PAYMENT METHOD BREAKDOWN (display only, from saved expenses)
+  // PAYMENT METHOD BREAKDOWN
   const methodBreakdown = useMemo(() => {
     const totals = {};
 
@@ -502,28 +493,17 @@ function Expenses() {
         note: form.note.trim(),
       };
 
-      const url = editingId
-        ? `${API_URL}/${editingId}`
-        : API_URL;
+      const response = editingId
+        ? await api.put(`${API_URL}/${editingId}`, payload)
+        : await api.post(API_URL, payload);
 
-      const response = await fetch(url, {
-        method: editingId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const data = response.data;
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || "Unable to save expense.");
       }
 
-      // REFRESH EXPENSES PAGE
       await fetchExpenses();
-
-      // REFRESH PRODUCT CONTEXT FOR DASHBOARD AND REPORTS
       await refreshData();
 
       alert(
@@ -535,8 +515,13 @@ function Expenses() {
       setEditingId(null);
       setForm({ ...initialForm, date: getTodayDate() });
     } catch (err) {
-      setError(err.message);
-      alert(err.message);
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Unable to save expense.";
+
+      setError(message);
+      alert(message);
     } finally {
       setSaving(false);
     }
@@ -566,22 +551,17 @@ function Expenses() {
       setDeletingId(id);
       setError("");
 
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-      });
+      const response = await api.delete(`${API_URL}/${id}`);
+      const data = response.data;
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || "Unable to delete expense.");
       }
 
-      // UPDATE LOCAL EXPENSE LIST
       setExpenses((prev) =>
         prev.filter((expense) => expense.id !== id)
       );
 
-      // REFRESH CONTEXT FOR DASHBOARD AND REPORTS
       await refreshData();
 
       if (editingId === id) {
@@ -591,8 +571,13 @@ function Expenses() {
 
       alert("Expense deleted successfully!");
     } catch (err) {
-      setError(err.message);
-      alert(err.message);
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Unable to delete expense.";
+
+      setError(message);
+      alert(message);
     } finally {
       setDeletingId(null);
     }
@@ -689,7 +674,6 @@ function Expenses() {
 
   return (
     <div className="relative min-h-screen bg-[#FFFDF5] p-3 text-[#001F0B] sm:p-5 lg:p-7">
-      {/* soft background glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(223,169,0,0.10),transparent_65%)]" />
 
       <div className="relative space-y-6">
@@ -873,7 +857,6 @@ function Expenses() {
 
                 <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-7">
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-
                     <div className="sm:col-span-2">
                       <label className={labelClass}>Expense Name *</label>
                       <input

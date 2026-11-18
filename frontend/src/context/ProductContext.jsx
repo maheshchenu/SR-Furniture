@@ -7,35 +7,46 @@ import {
   useState,
 } from "react";
 
+import api from "../services/api";
+
 const ProductContext = createContext();
 
-const PRODUCTS_API = "http://localhost:5000/api/products";
-const SALES_API = "http://localhost:5000/api/sales";
-const EXPENSES_API = "http://localhost:5000/api/expenses";
+// API ENDPOINTS
+const PRODUCTS_API = "/api/products";
+const SALES_API = "/api/sales";
+const EXPENSES_API = "/api/expenses";
 
 // API REQUEST HELPER
 const apiRequest = async (url, options = {}) => {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-  let data;
-
   try {
-    data = await response.json();
-  } catch {
-    throw new Error("Invalid server response.");
-  }
+    const response = await api.request({
+      url,
+      method: options.method || "GET",
+      data: options.body
+        ? JSON.parse(options.body)
+        : undefined,
+      headers: options.headers,
+    });
 
-  if (!response.ok || data.success === false) {
-    throw new Error(data.message || "Something went wrong.");
-  }
+    const data = response.data;
 
-  return data;
+    if (data.success === false) {
+      throw new Error(
+        data.message || "Something went wrong."
+      );
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error("API Request Error:", error);
+
+    throw new Error(
+      error.response?.data?.message ||
+      error.message ||
+      "Something went wrong."
+    );
+  }
 };
 
 // MAP PRODUCT DATA
@@ -227,50 +238,48 @@ export function ProductProvider({ children }) {
   };
 
   // CREATE BILL
- 
-// CREATE BILL
-const recordBill = async ({
-  items,
-  billNumber,
-  date,
-  customerName = "",
-  customerMobile = "",
-  discount = 0,
-  paidAmount = 0,
-}) => {
-  try {
-    const data = await apiRequest(SALES_API, {
-      method: "POST",
-      body: JSON.stringify({
-        items,
-        billNumber: String(billNumber || "").trim(),
-        date,
-        customerName,
-        customerMobile,
-        discount: Number(discount),
-        paidAmount: Number(paidAmount),
-      }),
-    });
+  const recordBill = async ({
+    items,
+    billNumber,
+    date,
+    customerName = "",
+    customerMobile = "",
+    discount = 0,
+    paidAmount = 0,
+  }) => {
+    try {
+      const data = await apiRequest(SALES_API, {
+        method: "POST",
+        body: JSON.stringify({
+          items,
+          billNumber: String(billNumber || "").trim(),
+          date,
+          customerName,
+          customerMobile,
+          discount: Number(discount),
+          paidAmount: Number(paidAmount),
+        }),
+      });
 
-    await refreshData();
+      await refreshData();
 
-    const sale = data.sale
-      ? mapSale(data.sale)
-      : null;
+      const sale = data.sale
+        ? mapSale(data.sale)
+        : null;
 
-    return {
-      success: true,
-      message: data.message || "Bill created successfully.",
-      sale,
-      bill: sale,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: err.message,
-    };
-  }
-};
+      return {
+        success: true,
+        message: data.message || "Bill created successfully.",
+        sale,
+        bill: sale,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.message,
+      };
+    }
+  };
 
   // RECORD SALE
   const recordSale = async (saleData) => {

@@ -1,10 +1,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import api from "../services/api";
 
 /* ================= CONFIG ================= */
 
-const API_URL = "http://localhost:5000/api/manufacturers";
+const API_URL = "/api/manufacturers";
 
 /* ================= HELPERS ================= */
 
@@ -94,21 +95,30 @@ const getSummary = (supplier) => {
 /* ================= API HELPER ================= */
 
 const apiRequest = async (url, options = {}) => {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  try {
+    const response = await api.request({
+      url,
+      method: options.method || "GET",
+      data: options.body ? JSON.parse(options.body) : undefined,
+      headers: options.headers,
+    });
 
-  const data = await response.json().catch(() => ({}));
+    const data = response.data;
 
-  if (!response.ok || data.success === false) {
-    throw new Error(data.message || "Something went wrong");
+    if (data?.success === false) {
+      throw new Error(data.message || "Something went wrong");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Manufacturer API Error:", error);
+
+    throw new Error(
+      error.response?.data?.message ||
+      error.message ||
+      "Something went wrong"
+    );
   }
-
-  return data;
 };
 
 /* ================= MODAL ================= */
@@ -161,7 +171,8 @@ function ModalFooter({ onCancel, submitText }) {
 
       <button
         type="submit"
-        className="flex-1 rounded-xl bg-[#5B3A29] py-3 text-sm font-bold text-white hover:bg-[#42291E]"
+        disabled={submitText === "Saving..."}
+        className="flex-1 rounded-xl bg-[#5B3A29] py-3 text-sm font-bold text-white hover:bg-[#42291E] disabled:opacity-60"
       >
         {submitText}
       </button>
