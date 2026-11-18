@@ -25,46 +25,51 @@ import { getAdminToken } from "./services/api";
 function ProtectedRoute() {
   const token = getAdminToken();
 
-  return token ? <Outlet /> : <Navigate to="/" replace />;
+  return token ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
 function App() {
-  const isAuthenticated = Boolean(getAdminToken());
-
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* Root URL: Login or Dashboard */}
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? <DashboardLayout /> : <AdminLogin />
-          }
-        >
-          <Route index element={<Dashboard />} />
-
-          <Route
-            element={<ProtectedRoute />}
-          >
-            <Route path="categories" element={<Categories />} />
-            <Route path="products" element={<Products />} />
-            <Route path="sales" element={<Sales />} />
-            <Route path="expenses" element={<Expenses />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="customer-dues" element={<CustomerDues />} />
-            <Route
-              path="manufacturer-payments"
-              element={<ManufacturerPayments />}
-            />
-          </Route>
-        </Route>
-
-        {/* Old Login URL redirects to Root */}
+        {/* Admin Login */}
         <Route
           path="/login"
-          element={<Navigate to="/" replace />}
+          element={
+            getAdminToken() ? (
+              <Navigate to="/" replace />
+            ) : (
+              <AdminLogin />
+            )
+          }
         />
+
+        {/* Protected Dashboard */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout />}>
+
+            <Route path="/" element={<Dashboard />} />
+
+            <Route path="/categories" element={<Categories />} />
+
+            <Route path="/products" element={<Products />} />
+
+            <Route path="/sales" element={<Sales />} />
+
+            <Route path="/expenses" element={<Expenses />} />
+
+            <Route path="/reports" element={<Reports />} />
+
+            <Route path="/customer-dues" element={<CustomerDues />} />
+
+            <Route
+              path="/manufacturer-payments"
+              element={<ManufacturerPayments />}
+            />
+
+          </Route>
+        </Route>
 
         {/* Invalid URL */}
         <Route
