@@ -1,17 +1,18 @@
-
+const mongoose = require("mongoose");
 const Category = require("../models/Category");
+const Product = require("../models/Product");
 
 // Get all categories
 const getCategories = async (req, res) => {
   try {
     const categories = await Category.find().sort({ createdAt: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       categories,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -30,8 +31,9 @@ const addCategory = async (req, res) => {
       });
     }
 
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const existingCategory = await Category.findOne({
-      name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      name: { $regex: `^${escapedName}$`, $options: "i" },
     });
 
     if (existingCategory) {
@@ -43,23 +45,32 @@ const addCategory = async (req, res) => {
 
     const category = await Category.create({ name });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Category added successfully",
       category,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
 
-// Delete category
+// Delete category and all products assigned to it
 const deleteCategory = async (req, res) => {
   try {
-    const category = await Category.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category ID",
+      });
+    }
+
+    const category = await Category.findById(id);
 
     if (!category) {
       return res.status(404).json({
@@ -68,12 +79,20 @@ const deleteCategory = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    // Product.category is stored as the category name, not category ObjectId.
+    const productDeleteResult = await Product.deleteMany({
+      category: { $regex: `^${category.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    });
+
+    await Category.findByIdAndDelete(id);
+
+    return res.status(200).json({
       success: true,
-      message: "Category deleted successfully",
+      message: `Category deleted successfully. ${productDeleteResult.deletedCount} related product(s) deleted.`,
+      deletedProducts: productDeleteResult.deletedCount,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

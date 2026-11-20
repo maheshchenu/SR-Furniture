@@ -175,6 +175,26 @@ export function ProductProvider({ children }) {
     }
   };
 
+  // UPDATE PRODUCT (including direct stock quantity edits)
+  const updateProduct = async (productId, productData) => {
+    try {
+      const data = await apiRequest(`${PRODUCTS_API}/${productId}`, {
+        method: "PUT",
+        body: JSON.stringify(productData),
+      });
+
+      await refreshData();
+
+      return {
+        success: true,
+        message: data.message || "Product updated successfully.",
+        product: data.product ? mapProduct(data.product) : null,
+      };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
   // ADD STOCK
   const addStock = async ({
     productId,
@@ -246,6 +266,8 @@ export function ProductProvider({ children }) {
     customerMobile = "",
     discount = 0,
     paidAmount = 0,
+    gstRate = 0,
+    placeOfSupply = "Andhra Pradesh",
   }) => {
     try {
       const data = await apiRequest(SALES_API, {
@@ -258,6 +280,8 @@ export function ProductProvider({ children }) {
           customerMobile,
           discount: Number(discount),
           paidAmount: Number(paidAmount),
+          gstRate: Number(gstRate),
+          placeOfSupply,
         }),
       });
 
@@ -321,6 +345,17 @@ export function ProductProvider({ children }) {
         success: false,
         message: err.message,
       };
+    }
+  };
+
+  // PERMANENTLY DELETE BILL (stock is intentionally untouched)
+  const deleteBill = async (billId) => {
+    try {
+      const data = await apiRequest(`${SALES_API}/${billId}`, { method: "DELETE" });
+      await refreshData();
+      return { success: true, message: data.message || "Bill permanently deleted." };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
   };
 
@@ -413,12 +448,14 @@ export function ProductProvider({ children }) {
         refreshData,
 
         addProduct,
+        updateProduct,
         addStock,
         deleteProduct,
 
         recordBill,
         recordSale,
         addPayment,
+        deleteBill,
 
         addExpense,
         updateExpense,

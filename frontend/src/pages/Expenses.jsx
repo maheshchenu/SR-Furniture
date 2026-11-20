@@ -610,6 +610,36 @@ function Expenses() {
         ).toLocaleDateString("en-IN")
       : "-";
 
+  // EXPORT FILTERED EXPENSES TO EXCEL-COMPATIBLE CSV
+  const exportToExcel = () => {
+    const rows = [
+      ["Expense Name", "Date", "Payment Method", "Note", "Amount"],
+      ...filteredExpenses.map((expense) => [
+        expense.title || "",
+        getDateOnly(expense.date),
+        expense.paymentMethod || "",
+        expense.note || "",
+        Number(expense.amount || 0),
+      ]),
+      ["", "", "", "Filtered Total", filteredTotal],
+    ];
+    const csv = rows.map((row) => row.map((value) => {
+      const text = String(value ?? "");
+      return `\"${text.replace(/\"/g, '""')}\"`;
+    }).join(",")).join("\r\n");
+    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `expenses_${getTodayDate()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const printExpenses = () => window.print();
+
   const statCards = [
     {
       title: "Today's Expenses",
@@ -1125,9 +1155,17 @@ function Expenses() {
                     </p>
                   </div>
 
-                  <span className="rounded-full border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2 text-xs font-extrabold text-[#7A5A00]">
-                    {filteredExpenses.length} Records
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2 text-xs font-extrabold text-[#7A5A00]">
+                      {filteredExpenses.length} Records
+                    </span>
+                    <button type="button" onClick={exportToExcel} className={ghostButtonClass}>
+                      <Icon name="stack" className="h-4 w-4" /> Export Excel
+                    </button>
+                    <button type="button" onClick={printExpenses} className={greenButtonClass}>
+                      <Icon name="calendar" className="h-4 w-4" /> Print A4
+                    </button>
+                  </div>
                 </div>
 
                 {/* FILTERS */}
@@ -1366,6 +1404,31 @@ function Expenses() {
             </div>
           </>
         )}
+      </div>
+      <style>{`
+        .expense-print-report { display: none; }
+        @media print {
+          @page { size: A4 portrait; margin: 12mm; }
+          body { background: white !important; }
+          body * { visibility: hidden !important; }
+          .expense-print-report, .expense-print-report * { visibility: visible !important; }
+          .expense-print-report { display: block !important; position: absolute; inset: 0; width: 100%; color: #111; font-family: Arial, sans-serif; }
+          .expense-print-report table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          .expense-print-report th, .expense-print-report td { border: 1px solid #555; padding: 6px; text-align: left; word-break: break-word; }
+          .expense-print-report th { background: #eee !important; }
+        }
+      `}</style>
+      <div className="expense-print-report">
+        <h1 style={{ textAlign: "center", marginBottom: 4 }}>SR Sofas & Furniture</h1>
+        <h2 style={{ textAlign: "center", marginTop: 0 }}>Expense Report</h2>
+        <p>Printed: {new Date().toLocaleDateString("en-IN")} | Records: {filteredExpenses.length}</p>
+        <table>
+          <thead><tr><th>Expense Name</th><th>Date</th><th>Payment Method</th><th>Note</th><th>Amount (₹)</th></tr></thead>
+          <tbody>{filteredExpenses.map((expense) => (
+            <tr key={expense.id}><td>{expense.title}</td><td>{formatRowDate(expense)}</td><td>{expense.paymentMethod || "-"}</td><td>{expense.note || "-"}</td><td>{Number(expense.amount || 0).toLocaleString("en-IN")}</td></tr>
+          ))}</tbody>
+          <tfoot><tr><th colSpan="4" style={{ textAlign: "right" }}>Filtered Total</th><th>{formatINR(filteredTotal)}</th></tr></tfoot>
+        </table>
       </div>
     </div>
   );

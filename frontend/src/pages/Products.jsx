@@ -26,7 +26,7 @@ const getToday = () => {
 
 const emptyVariant = () => ({
   name: "",
-  color: "",
+  warranty: "",
   mrp: "",
   purchasePrice: "",
   sellingPrice: "",
@@ -101,6 +101,7 @@ const ICONS = {
   close: "M6 6l12 12M18 6 6 18",
   alert:
     "M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z",
+  edit: "M12 20h9M16.5 3.5a2.12 2.12 0 013 3L8 18l-4 1 1-4Z",
 };
 
 function Icon({ name, className = "h-5 w-5", strokeWidth = 2 }) {
@@ -485,6 +486,7 @@ function Products() {
   const {
     products = [],
     addProduct,
+    updateProduct,
     addStock,
     deleteProduct,
     loading,
@@ -496,6 +498,7 @@ function Products() {
   const [stockFilter, setStockFilter] = useState("All");
 
   const [form, setForm] = useState(createInitialForm());
+  const [editingProductId, setEditingProductId] = useState(null);
 
   const [stockTarget, setStockTarget] = useState(null);
   const [stockVariantId, setStockVariantId] = useState("");
@@ -609,7 +612,7 @@ function Products() {
       variants: form.variants.map((variant) => ({
         ...variant,
         name: variant.name.trim(),
-        color: variant.color.trim(),
+        warranty: variant.warranty.trim(),
         mrp: Number(variant.mrp),
         purchasePrice: Number(variant.purchasePrice),
         sellingPrice: Number(variant.sellingPrice),
@@ -620,7 +623,9 @@ function Products() {
     try {
       setSavingProduct(true);
 
-      const result = await addProduct(product);
+      const result = editingProductId
+        ? await updateProduct(editingProductId, product)
+        : await addProduct(product);
 
       if (!result.success) {
         alert(result.message);
@@ -628,12 +633,39 @@ function Products() {
       }
 
       setForm(createInitialForm());
-      alert("Product added successfully!");
+      setEditingProductId(null);
+      alert(editingProductId ? "Product updated successfully!" : "Product added successfully!");
     } catch (error) {
       alert(error.message || "Failed to add product.");
     } finally {
       setSavingProduct(false);
     }
+  };
+
+  // OPEN PRODUCT EDIT FORM
+  const handleEditProduct = (product) => {
+    setEditingProductId(product.id);
+    setForm({
+      category: product.category || "",
+      company: product.company || "",
+      model: product.model || "",
+      addedDate: product.addedDate || getToday(),
+      variants: (product.variants || []).map((variant) => ({
+        _id: variant.id || variant._id,
+        name: variant.name || "",
+        warranty: variant.warranty || "",
+        mrp: String(variant.mrp ?? ""),
+        purchasePrice: String(variant.purchasePrice ?? ""),
+        sellingPrice: String(variant.sellingPrice ?? ""),
+        quantity: String(variant.quantity ?? 0),
+      })),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelProductEdit = () => {
+    setEditingProductId(null);
+    setForm(createInitialForm());
   };
 
   // OPEN STOCK MODAL
@@ -742,7 +774,7 @@ function Products() {
         product.model,
         ...(product.variants || []).flatMap((variant) => [
           variant.name,
-          variant.color,
+          variant.warranty,
         ]),
       ]
         .filter(Boolean)
@@ -784,7 +816,7 @@ function Products() {
               product,
               variantId: variant.id,
               productName: product.name,
-              variantLabel: [variant.name, variant.color]
+              variantLabel: [variant.name, variant.warranty]
                 .filter(Boolean)
                 .join(" · "),
               quantity,
@@ -1153,11 +1185,13 @@ function Products() {
 
             <div>
               <h2 className="text-xl font-extrabold text-[#003B16]">
-                Add New Product
+                {editingProductId ? "Edit Product / Update Stock" : "Add New Product"}
               </h2>
 
               <p className="mt-1 text-xs text-[#6B7A6F]">
-                Select category, company, model and create variants.
+                {editingProductId
+                  ? "Edit product details, prices, warranty or correct stock quantity."
+                  : "Select category, company, model and create variants."}
               </p>
             </div>
           </div>
@@ -1321,16 +1355,16 @@ function Products() {
 
                     <div>
                       <label className={labelClass}>
-                        Color
+                        Warranty
                       </label>
 
                       <input
-                        name="color"
-                        value={variant.color}
+                        name="warranty"
+                        value={variant.warranty}
                         onChange={(e) =>
                           handleVariantChange(index, e)
                         }
-                        placeholder="Example: Brown"
+                        placeholder="Example: 1 years"
                         className={inputClass}
                       />
                     </div>
@@ -1382,6 +1416,16 @@ function Products() {
 
           {/* SUBMIT */}
           <div className="flex flex-col-reverse gap-3 border-t border-[#EFE8CF] pt-6 sm:flex-row sm:justify-end">
+            {editingProductId && (
+              <button
+                type="button"
+                onClick={cancelProductEdit}
+                disabled={savingProduct}
+                className="w-full rounded-xl border border-[#D8CFB5] bg-white px-6 py-3 text-sm font-bold text-[#45604C] transition hover:bg-[#FFF8E1] sm:w-auto"
+              >
+                Cancel Edit
+              </button>
+            )}
             <button
               type="submit"
               disabled={categories.length === 0 || savingProduct}
@@ -1398,11 +1442,11 @@ function Products() {
                 ) : (
                   <>
                     <Icon
-                      name="plus"
+                      name={editingProductId ? "check" : "plus"}
                       className="h-4 w-4"
                       strokeWidth={3}
                     />
-                    Add Product
+                    {editingProductId ? "Save Changes" : "Add Product"}
                   </>
                 )}
               </span>
@@ -1555,6 +1599,14 @@ function Products() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
+                      onClick={() => handleEditProduct(product)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2.5 text-xs font-bold text-[#654D08] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#FFE69A]"
+                    >
+                      <Icon name="edit" className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openStockModal(product)}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-[#0A4F24] to-[#003B16] px-4 py-2.5 text-xs font-bold text-[#FFD75A] shadow-sm ring-1 ring-[#DFA900]/30 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30"
                     >
@@ -1593,7 +1645,7 @@ function Products() {
                           <th className="px-4 py-4">
                             Variant / Size
                           </th>
-                          <th className="px-4 py-4">Color</th>
+                          <th className="px-4 py-4">Warranty</th>
                           <th className="px-4 py-4">MRP</th>
                           <th className="px-4 py-4">Purchase</th>
                           <th className="px-4 py-4">Selling</th>
@@ -1624,7 +1676,7 @@ function Products() {
                               </td>
 
                               <td className="px-4 py-4 text-[#6B7A6F]">
-                                {variant.color || "-"}
+                                {variant.warranty || "-"}
                               </td>
 
                               <td className="px-4 py-4 tabular-nums text-[#6B7A6F]">

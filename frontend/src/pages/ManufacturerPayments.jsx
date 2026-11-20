@@ -520,6 +520,43 @@ function ManufacturerPayments() {
     }
   };
 
+  /* ================= DELETE SUPPLIER ================= */
+  const deleteSupplier = async (supplier) => {
+    const summary = getSummary(supplier);
+    const warning = summary.balance !== 0
+      ? `\nThis supplier has an outstanding balance of ${money(summary.balance)}.`
+      : "";
+    if (!window.confirm(`Delete supplier ${supplier.name}? This will delete supplier purchase/payment records too.${warning}`)) return;
+    try {
+      setSaving(true);
+      await apiRequest(`${API_URL}/${supplier.id}`, { method: "DELETE" });
+      await fetchSuppliers();
+      alert("Supplier deleted successfully");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ================= EXPORT / PRINT ================= */
+  const exportSuppliersCSV = () => {
+    const rows = [["Supplier", "Phone", "Address", "Total Purchases", "Total Paid", "Balance", "Invoice", "Purchase Date", "Bill Amount", "Bill Paid", "Bill Balance"]];
+    suppliers.forEach((supplier) => {
+      const summary = getSummary(supplier);
+      if (!supplier.purchases.length) rows.push([supplier.name, supplier.phone, supplier.address, summary.totalPurchase, summary.totalPaid, summary.balance, "", "", "", "", ""]);
+      supplier.purchases.forEach((bill) => {
+        const billSummary = getBillSummary(bill);
+        rows.push([supplier.name, supplier.phone, supplier.address, summary.totalPurchase, summary.totalPaid, summary.balance, bill.invoiceNumber, formatDate(bill.purchaseDate), billSummary.totalPurchase, billSummary.totalPaid, billSummary.balance]);
+      });
+    });
+    const csv = rows.map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "supplier_accounts.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   /* ================= STATUS ================= */
 
   const getStatus = (balance, paid) => {
@@ -563,12 +600,16 @@ function ManufacturerPayments() {
             </p>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={exportSuppliersCSV} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Export Excel</button>
+            <button type="button" onClick={() => window.print()} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Print A4</button>
           <button
             onClick={() => setShowSupplierModal(true)}
             className="rounded-xl bg-[#5B3A29] px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-[#42291E]"
           >
             + Add Supplier
           </button>
+          </div>
         </div>
 
         {/* ERROR */}
@@ -669,14 +710,10 @@ function ManufacturerPayments() {
                   const active = selectedSupplierId === supplier.id;
 
                   return (
+                    <div key={supplier.id} className={`rounded-xl border p-3 ${active ? "border-[#A17C42] bg-[#F8F2E6]" : "border-transparent hover:bg-[#FAF8F3]"}`}>
                     <button
-                      key={supplier.id}
                       onClick={() => setSelectedSupplierId(supplier.id)}
-                      className={`w-full rounded-xl border p-4 text-left transition ${
-                        active
-                          ? "border-[#A17C42] bg-[#F8F2E6]"
-                          : "border-transparent hover:bg-[#FAF8F3]"
-                      }`}
+                      className="w-full p-1 text-left transition"
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#5B3A29] font-bold text-white">
@@ -703,6 +740,8 @@ function ManufacturerPayments() {
                         </span>
                       </div>
                     </button>
+                    <button type="button" onClick={() => deleteSupplier(supplier)} disabled={saving} className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Delete Supplier</button>
+                    </div>
                   );
                 })
               )}
@@ -992,8 +1031,9 @@ function ManufacturerPayments() {
               </div>
 
               <div>
-                <label className={labelClass}>Phone Number</label>
+                <label className={labelClass}>Phone Number *</label>
                 <input
+                  required
                   type="tel"
                   value={supplierForm.phone}
                   onChange={(e) =>
@@ -1530,6 +1570,12 @@ function ManufacturerPayments() {
           </div>
         </Modal>
       )}
+      <div className="supplier-print-report">
+        <h1>Supplier Accounts Report</h1>
+        <table><thead><tr><th>Supplier</th><th>Phone</th><th>Purchase</th><th>Paid</th><th>Balance</th><th>Invoice</th><th>Date</th><th>Bill Amount</th><th>Bill Paid</th><th>Bill Balance</th></tr></thead>
+        <tbody>{suppliers.flatMap(supplier => supplier.purchases.length ? supplier.purchases.map(bill => { const sum=getSummary(supplier); const bs=getBillSummary(bill); return <tr key={`${supplier.id}-${bill.id}`}><td>{supplier.name}</td><td>{supplier.phone}</td><td>{money(sum.totalPurchase)}</td><td>{money(sum.totalPaid)}</td><td>{money(sum.balance)}</td><td>{bill.invoiceNumber || "-"}</td><td>{formatDate(bill.purchaseDate)}</td><td>{money(bs.totalPurchase)}</td><td>{money(bs.totalPaid)}</td><td>{money(bs.balance)}</td></tr>; }) : (() => { const sum=getSummary(supplier); return [<tr key={supplier.id}><td>{supplier.name}</td><td>{supplier.phone}</td><td>{money(sum.totalPurchase)}</td><td>{money(sum.totalPaid)}</td><td>{money(sum.balance)}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>]; })())}</tbody></table>
+      </div>
+      <style>{`@media print { @page { size: A4 landscape; margin: 10mm; } body * { visibility: hidden !important; } .supplier-print-report, .supplier-print-report * { visibility: visible !important; } .supplier-print-report { display:block !important; position:absolute; inset:0; width:100%; color:#000; font-size:9pt; } .supplier-print-report h1 { font-size:16pt; margin-bottom:12px; } .supplier-print-report table { width:100%; border-collapse:collapse; } .supplier-print-report th,.supplier-print-report td { border:1px solid #555; padding:5px; text-align:left; } .supplier-print-report th { background:#eee !important; } } .supplier-print-report { display:none; }`}</style>
     </div>
   );
 }

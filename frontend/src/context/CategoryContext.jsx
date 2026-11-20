@@ -85,13 +85,18 @@ export function CategoryProvider({ children }) {
   // Delete category from MongoDB
   const deleteCategory = async (id) => {
     try {
-      await api.delete(`/api/categories/${id}`);
+      const response = await api.delete(`/api/categories/${id}`);
+      const data = response.data;
 
       setCategories((prev) =>
         prev.filter((category) => category.id !== id)
       );
 
-      return true;
+      return {
+        success: true,
+        message: data.message || "Category and related products deleted successfully.",
+        deletedProducts: data.deletedProducts || 0,
+      };
 
     } catch (error) {
       console.error("Delete Category Error:", error);

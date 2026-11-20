@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useCategories } from "../context/CategoryContext";
+import { useProducts } from "../context/ProductContext";
 
 /* ------------------------------------------------------------------ */
 /* UI-only styling helpers (no business logic)                         */
@@ -51,6 +52,8 @@ function Categories() {
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  const { refreshData } = useProducts();
 
   const {
     categories = [],
@@ -105,7 +108,7 @@ function Categories() {
   // Delete Category
   const handleDelete = async (category) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${category.name}"?`
+      `Delete "${category.name}" and ALL products under this category?\n\nThis action cannot be undone.`
     );
 
     if (!confirmed) return;
@@ -113,9 +116,10 @@ function Categories() {
     try {
       setDeletingId(category.id);
 
-      await deleteCategory(category.id);
+      const result = await deleteCategory(category.id);
+      await refreshData();
 
-      alert("Category deleted successfully!");
+      alert(result.message || "Category and related products deleted successfully!");
     } catch (error) {
       alert(error.message || "Failed to delete category.");
     } finally {

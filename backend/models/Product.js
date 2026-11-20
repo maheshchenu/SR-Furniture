@@ -10,7 +10,7 @@ const variantSchema = new mongoose.Schema(
       trim: true,
     },
 
-    color: {
+    warranty: {
       type: String,
       default: "",
       trim: true,

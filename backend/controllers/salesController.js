@@ -67,6 +67,8 @@ const createBill = async (req, res) => {
       customerMobile = "",
       discount = 0,
       paidAmount = 0,
+      gstRate = 0,
+      placeOfSupply = "Andhra Pradesh",
     } = req.body;
 
     // VALIDATE BILL NUMBER
@@ -111,6 +113,8 @@ const createBill = async (req, res) => {
 
     const discountValue = Number(discount);
     const paidValue = Number(paidAmount);
+    const gstValue = Number(gstRate);
+    if (!Number.isFinite(gstValue) || gstValue < 0 || gstValue > 100) return res.status(400).json({ success: false, message: "GST rate must be between 0 and 100" });
 
     if (
       !Number.isFinite(discountValue) ||
@@ -244,7 +248,13 @@ const createBill = async (req, res) => {
         throw new Error("Discount cannot be greater than subtotal");
       }
 
-      const grandTotal = subtotal - discountValue;
+      const taxableAmount = subtotal - discountValue;
+      const isInterState = !String(placeOfSupply).toLowerCase().includes("andhra");
+      const totalGST = taxableAmount * gstValue / 100;
+      const cgstAmount = isInterState ? 0 : totalGST / 2;
+      const sgstAmount = isInterState ? 0 : totalGST / 2;
+      const igstAmount = isInterState ? totalGST : 0;
+      const grandTotal = Number((taxableAmount + totalGST).toFixed(2));
 
       if (paidValue > grandTotal) {
         throw new Error("Paid amount cannot be greater than bill total");
@@ -261,6 +271,12 @@ const createBill = async (req, res) => {
         totalItems,
         subtotal,
         discount: discountValue,
+        gstRate: gstValue,
+        taxableAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        placeOfSupply,
         grandTotal,
         paidAmount: paidValue,
         balanceDue,
@@ -373,7 +389,28 @@ const addPayment = async (req, res) => {
   }
 };
 
+
+// PERMANENTLY DELETE BILL. Deliberately does not modify product stock.
+const deleteBill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid bill ID" });
+    }
+    const deletedSale = await Sale.findByIdAndDelete(id);
+    if (!deletedSale) {
+      return res.status(404).json({ success: false, message: "Bill not found" });
+    }
+    // Payment history is embedded in the Sale document, so it is removed with the bill.
+    // Product stock is intentionally left unchanged.
+    return res.status(200).json({ success: true, message: "Bill permanently deleted. Stock quantity was not changed." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
+  deleteBill,
   getSales,
   getSaleById,
   createBill,

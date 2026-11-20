@@ -184,6 +184,15 @@ const saleSchema = new mongoose.Schema(
       default: [],
     },
 
+    gstRate: { type: Number, default: 0, min: 0, max: 100 },
+    taxableAmount: { type: Number, default: 0, min: 0 },
+    cgstAmount: { type: Number, default: 0, min: 0 },
+    sgstAmount: { type: Number, default: 0, min: 0 },
+    igstAmount: { type: Number, default: 0, min: 0 },
+    placeOfSupply: { type: String, default: "Andhra Pradesh", trim: true },
+    isCancelled: { type: Boolean, default: false },
+    cancelledAt: { type: Date, default: null },
+    cancellationReason: { type: String, default: "", trim: true },
     totalProfit: {
       type: Number,
       default: 0,

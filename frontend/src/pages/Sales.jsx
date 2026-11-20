@@ -68,6 +68,7 @@ const getBillBalance = (bill) =>
   );
 
 const getBillStatus = (bill) => {
+  if (bill.isCancelled) return "Cancelled";
   const billBalance = getBillBalance(bill);
   const billPaid = Number(bill.paidAmount || 0);
 
@@ -284,6 +285,7 @@ function Sales() {
     products = [],
     sales = [],
     recordBill,
+    deleteBill,
     loading,
     refreshData,
   } = useProducts();
@@ -308,10 +310,13 @@ function Sales() {
   const [customerMobile, setCustomerMobile] = useState("");
   const [discount, setDiscount] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
+  const [gstRate, setGstRate] = useState("0");
+  const [placeOfSupply, setPlaceOfSupply] = useState("Andhra Pradesh");
 
   const [message, setMessage] = useState("");
   const [stockWarning, setStockWarning] = useState("");
   const [lastBill, setLastBill] = useState(null);
+  const [billPrintType, setBillPrintType] = useState("gst");
   const [savingBill, setSavingBill] = useState(false);
   const [expandedBills, setExpandedBills] = useState([]);
 
@@ -387,11 +392,18 @@ function Sales() {
           ? category?.id ?? category?._id
           : product.categoryId ?? category;
 
-      return (
+      const categoryMatches =
         String(categoryName || "").toLowerCase() ===
           String(selectedCategory.label).toLowerCase() ||
-        String(categoryId || "") === String(selectedCategory.value)
-      );
+        String(categoryId || "") === String(selectedCategory.value);
+
+      // Hide products that have no stock available. For size-based products,
+      // show the product only when at least one variant has stock.
+      const hasStock = Array.isArray(product.variants) && product.variants.length > 0
+        ? product.variants.some((variant) => Number(variant.quantity || 0) > 0)
+        : Number(product.quantity || 0) > 0;
+
+      return categoryMatches && hasStock;
     });
   }, [products, selectedCategory]);
 
@@ -433,7 +445,9 @@ function Sales() {
   );
 
   // Step 4: sizes (variants) of the selected model
-  const variants = selectedProduct?.variants || [];
+  const variants = (selectedProduct?.variants || []).filter(
+    (variant) => Number(variant.quantity || 0) > 0
+  );
 
   const sortedSales = useMemo(() => {
     return [...sales].sort(
@@ -714,7 +728,9 @@ function Sales() {
   );
 
   const discountAmount = Math.max(0, Number(discount || 0));
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const gstAmount = taxableAmount * Math.max(0, Number(gstRate || 0)) / 100;
+  const grandTotal = Number((taxableAmount + gstAmount).toFixed(2));
   const paid = Math.max(0, Number(paidAmount || 0));
   const balance = Math.max(0, grandTotal - paid);
 
@@ -784,6 +800,8 @@ function Sales() {
         customerMobile: customerMobile.trim(),
         discount: discountAmount,
         paidAmount: paid,
+        gstRate: Number(gstRate || 0),
+        placeOfSupply,
       });
 
       if (!result?.success || !(result.bill || result.sale)) {
@@ -805,6 +823,8 @@ function Sales() {
       setCustomerMobile("");
       setDiscount("");
       setPaidAmount("");
+      setGstRate("0");
+      setPlaceOfSupply("Andhra Pradesh");
       setCategorySearch("");
       setSelectedCategory(null);
       resetFromCompany();
@@ -827,16 +847,33 @@ function Sales() {
     );
   };
 
-  const printBill = (type) => {
+  const printBill = (type = "gst", bill = lastBill) => {
+    if (!bill) return;
+    setLastBill(bill);
+    setBillPrintType(type);
     document.body.classList.remove("print-customer", "print-business");
-    document.body.classList.add(`print-${type}`);
-
+    document.body.classList.add("print-customer");
     window.onafterprint = () => {
       document.body.classList.remove("print-customer", "print-business");
       window.onafterprint = null;
     };
+    window.setTimeout(() => window.print(), 100);
+  };
 
-    window.print();
+  const exportSalesExcel = () => {
+    const rows = [["Bill Number","Date","Customer","Mobile","Subtotal","Discount","GST Rate (%)","GST Amount","Grand Total","Paid","Balance","Status"]];
+    filteredSales.forEach((b) => rows.push([b.billNumber || "", new Date(b.date || b.createdAt).toLocaleDateString("en-IN"), b.customerName || "Walk-in Customer", b.customerMobile || "", b.subtotal || 0, b.discount || 0, b.gstRate || 0, Number(b.cgstAmount || 0) + Number(b.sgstAmount || 0) + Number(b.igstAmount || 0), getBillTotal(b), b.paidAmount || 0, getBillBalance(b), b.isCancelled ? "Cancelled" : getBillStatus(b)]));
+    const csv = "\uFEFF" + rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a"); a.href = url; a.download = `SR-Furniture-Sales-${getTodayDate()}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteBill = async (bill) => {
+    const confirmed = window.confirm(`Permanently delete bill ${bill.billNumber}? This cannot be undone. Stock quantity will NOT change. Payment entries inside this bill will also be deleted.`);
+    if (!confirmed) return;
+    const result = await deleteBill(bill.id || bill._id);
+    setMessage(result.message || (result.success ? "Bill permanently deleted" : "Unable to delete bill"));
+    if (result.success && (lastBill?.id === bill.id || lastBill?._id === bill._id)) setLastBill(null);
   };
 
   const isSuccessMessage =
@@ -1663,6 +1700,15 @@ function Sales() {
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
+                  <label className="font-medium text-white/70">GST Rate (%)</label>
+                  <input type="number" min="0" max="100" step="0.01" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="w-36 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none" placeholder="0" />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <label className="font-medium text-white/70">Place of Supply</label>
+                  <select value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className="w-48 rounded-lg bg-white px-3 py-2 text-sm font-bold text-[#001F0B]"><option>Andhra Pradesh</option><option>Other State</option></select>
+                </div>
+                <div className="flex items-center justify-between gap-4 text-[#FFD75A]"><span>GST Amount</span><strong>{money(gstAmount)}</strong></div>
+                <div className="flex items-center justify-between gap-4">
                   <label className="font-medium text-white/70">
                     Paid Amount
                   </label>
@@ -1748,6 +1794,8 @@ function Sales() {
               </p>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={exportSalesExcel} className={goldButtonClass}>Export Excel (CSV)</button>
             <button
               type="button"
               onClick={() => refreshData?.()}
@@ -1756,6 +1804,7 @@ function Sales() {
               <Icon name="refresh" className="h-4 w-4" />
               Refresh Sales
             </button>
+            </div>
           </div>
 
           {/* DATE RANGE FILTER */}
@@ -1955,6 +2004,11 @@ function Sales() {
 
                     {isExpanded && (
                       <div className="border-t border-[#EFE8CF] bg-[#FFFDF5] p-4 sm:p-5">
+                        <div className="mb-4 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => printBill("customer", bill)} className={greenButtonClass}>Print Customer Bill</button>
+                          <button type="button" onClick={() => printBill("gst", bill)} className={goldButtonClass}>Print GST Invoice</button>
+                          <button type="button" onClick={() => handleDeleteBill(bill)} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white">Permanently Delete</button>
+                        </div>
                         <h4 className="mb-3 font-extrabold text-[#003B16]">
                           Sold Products
                         </h4>
@@ -2057,22 +2111,8 @@ function Sales() {
               />
 
               <div className="relative z-10">
-                <BillHeader bill={lastBill} />
-                <BillTable bill={lastBill} businessCopy={false} />
-              </div>
-            </section>
-
-            <section className="business-print fixed -left-[10000px] top-0 isolate min-h-[297mm] w-[210mm] overflow-hidden rounded-xl bg-white p-6 text-black">
-              <img
-                src={logo}
-                alt=""
-                aria-hidden="true"
-                className="bill-page-background pointer-events-none absolute inset-0 z-0 h-full w-full object-contain p-24 opacity-[0.10]"
-              />
-
-              <div className="relative z-10">
-                <BillHeader bill={lastBill} />
-                <BillTable bill={lastBill} businessCopy />
+                <BillHeader bill={lastBill} showGST={billPrintType === "gst"} />
+                <BillTable bill={lastBill} showGST={billPrintType === "gst"} />
               </div>
             </section>
 
@@ -2087,7 +2127,7 @@ function Sales() {
 
                   <div>
                     <h3 className="text-lg font-extrabold text-[#003B16]">
-                      Bill ready to print
+                      Bill copies ready to print
                     </h3>
                     <p className="mt-0.5 text-sm text-[#6B7A6F]">
                       {lastBill.billNumber || lastBill.id
@@ -2098,24 +2138,9 @@ function Sales() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => printBill("customer")}
-                    className={greenButtonClass}
-                  >
-                    <Icon name="print" className="h-4 w-4" />
-                    Customer Bill
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => printBill("business")}
-                    className={goldButtonClass}
-                  >
-                    <Icon name="print" className="h-4 w-4" />
-                    Business Bill
-                  </button>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => printBill("customer")} className={greenButtonClass}><Icon name="print" className="h-4 w-4" /> Customer Bill - Print</button>
+                  <button type="button" onClick={() => printBill("gst")} className={goldButtonClass}><Icon name="print" className="h-4 w-4" /> GST Tax Invoice - Print</button>
                 </div>
               </div>
             </div>
@@ -2204,7 +2229,7 @@ function BillContactFooter() {
   );
 }
 
-function BillHeader({ bill }) {
+function BillHeader({ bill, showGST = true }) {
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-[#003B22]">
       <div className="flex flex-wrap items-center justify-between gap-4 bg-[linear-gradient(135deg,#001F0B_0%,#003B16_100%)] px-5 py-4 text-white">
@@ -2223,14 +2248,14 @@ function BillHeader({ bill }) {
             </h1>
 
             <p className="mt-1 text-sm text-[#D5E6D9]">
-              Furniture Sales & Billing
+              Furniture Sales & Billing<br />Shanti Nagar, Kodada Road, Jaggayyapeta - 521175<br />{showGST && <>GSTIN: 37AFKFS7856K1Z2<br /></>}Mob: 7702786502, 9346467670, 9948380869
             </p>
           </div>
         </div>
 
         <div className="text-left sm:text-right">
           <h2 className="inline-block rounded-md bg-[#FFD75A] px-3 py-1 text-base font-extrabold tracking-widest text-[#001F0B]">
-            INVOICE
+            {showGST ? "GST TAX INVOICE" : "CUSTOMER BILL"}
           </h2>
 
           <p className="mt-2 text-sm">
@@ -2259,16 +2284,14 @@ function BillHeader({ bill }) {
           {bill.customerName || "Walk-in Customer"}
         </p>
 
-        <p>
-          <strong className="text-[#003B22]">Mobile:</strong>{" "}
-          {bill.customerMobile || "-"}
-        </p>
+        <p><strong className="text-[#003B22]">Mobile:</strong> {bill.customerMobile || "-"}</p>
+        {showGST && <p><strong className="text-[#003B22]">Place of Supply:</strong> {bill.placeOfSupply || "Andhra Pradesh"}</p>}
       </div>
     </div>
   );
 }
 
-function BillTable({ bill, businessCopy }) {
+function BillTable({ bill, showGST = true }) {
   const items = bill.items || [];
 
   const subtotal = Number(
@@ -2282,15 +2305,17 @@ function BillTable({ bill, businessCopy }) {
 
   const discount = Number(bill.discount || 0);
 
-  const grandTotal = Number(
-    bill.grandTotal ?? bill.totalAmount ?? subtotal - discount
-  );
+  const storedGrandTotal = Number(bill.grandTotal ?? bill.totalAmount ?? subtotal - discount);
 
+  const gstRate = Number(bill.gstRate || 0);
+  const taxableAmount = Number(bill.taxableAmount ?? Math.max(0, subtotal - discount));
+  const cgst = Number(bill.cgstAmount || 0);
+  const sgst = Number(bill.sgstAmount || 0);
+  const igst = Number(bill.igstAmount || 0);
+  const gstTotal = cgst + sgst + igst;
+  const grandTotal = showGST ? storedGrandTotal : Math.max(0, storedGrandTotal - gstTotal);
   const paid = Number(bill.paidAmount || 0);
-
-  const balance = Number(
-    bill.balanceDue ?? bill.balance ?? Math.max(0, grandTotal - paid)
-  );
+  const balance = showGST ? Number(bill.balanceDue ?? bill.balance ?? Math.max(0, grandTotal - paid)) : Math.max(0, grandTotal - paid);
 
   const totalProfit = Number(
     bill.totalProfit ??
@@ -2319,13 +2344,13 @@ function BillTable({ bill, businessCopy }) {
               <th className="p-2.5">Variant</th>
               <th className="p-2.5 text-center">Qty</th>
 
-              {businessCopy && <th className="p-2.5 text-right">Purchase</th>}
+              
 
               <th className="p-2.5 text-right">MRP</th>
               <th className="p-2.5 text-right">Selling Price</th>
               <th className="p-2.5 text-right">Total</th>
 
-              {businessCopy && <th className="p-2.5 text-right">Profit</th>}
+              
             </tr>
           </thead>
 
@@ -2360,9 +2385,6 @@ function BillTable({ bill, businessCopy }) {
 
                   <td className="p-2.5 text-center">{quantity}</td>
 
-                  {businessCopy && (
-                    <td className="p-2.5 text-right">{money(purchasePrice)}</td>
-                  )}
 
                   <td className="p-2.5 text-right">{money(item.mrp)}</td>
 
@@ -2372,9 +2394,6 @@ function BillTable({ bill, businessCopy }) {
                     {money(total)}
                   </td>
 
-                  {businessCopy && (
-                    <td className="p-2.5 text-right">{money(profit)}</td>
-                  )}
                 </tr>
               );
             })}
@@ -2389,10 +2408,10 @@ function BillTable({ bill, businessCopy }) {
             <strong>{money(subtotal)}</strong>
           </div>
 
-          <div className="flex justify-between">
-            <span>Discount</span>
-            <strong>{money(discount)}</strong>
-          </div>
+          <div className="flex justify-between"><span>Discount</span><strong>{money(discount)}</strong></div>
+          {showGST && <><div className="flex justify-between"><span>Taxable Amount</span><strong>{money(taxableAmount)}</strong></div>
+          <div className="flex justify-between"><span>GST ({gstRate}%)</span><strong>{money(gstTotal)}</strong></div>
+          {igst > 0 ? <div className="flex justify-between"><span>IGST</span><strong>{money(igst)}</strong></div> : <><div className="flex justify-between"><span>CGST</span><strong>{money(cgst)}</strong></div><div className="flex justify-between"><span>SGST</span><strong>{money(sgst)}</strong></div></>}</>}
         </div>
 
         <div className="flex justify-between bg-gradient-to-r from-[#FFD75A] to-[#DFA900] px-3 py-2.5 text-base text-[#001F0B]">
@@ -2411,17 +2430,12 @@ function BillTable({ bill, businessCopy }) {
             <strong>{money(balance)}</strong>
           </div>
 
-          {businessCopy && (
-            <div className="flex justify-between border-t border-gray-300 pt-2 text-green-800">
-              <strong>Total Profit</strong>
-              <strong>{money(totalProfit)}</strong>
-            </div>
-          )}
+
         </div>
       </div>
 
       {/* Blank ruled space on the customer bill - owner writes warranty / notes by pen */}
-      {!businessCopy && (
+      {(!showGST) && (
         <div className="mt-6 rounded-xl border border-dashed border-[#003B22] bg-white/60 px-4 pb-3 pt-3 text-xs">
           <p className="font-bold text-[#003B22]">Warranty / Notes:</p>
 
