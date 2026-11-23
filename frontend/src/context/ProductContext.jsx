@@ -54,6 +54,11 @@ const mapProduct = (product) => ({
   ...product,
   id: product._id || product.id,
 
+  sizes: (product.sizes || []).map((size) => ({
+    ...size,
+    id: size._id || size.id,
+  })),
+  // Legacy variants remain mapped for old products and old bill history.
   variants: (product.variants || []).map((variant) => ({
     ...variant,
     id: variant._id || variant.id,
@@ -75,6 +80,7 @@ const mapSale = (sale) => ({
     id: item._id || item.id,
     productId: item.productId?._id || item.productId,
     variantId: item.variantId?._id || item.variantId,
+    sizeId: item.sizeId?._id || item.sizeId,
   })),
 
   payments: (sale.payments || []).map((payment) => ({
@@ -198,6 +204,7 @@ export function ProductProvider({ children }) {
   // ADD STOCK
   const addStock = async ({
     productId,
+    sizeId,
     variantId,
     quantity,
     date,
@@ -209,6 +216,7 @@ export function ProductProvider({ children }) {
           method: "POST",
           body: JSON.stringify({
             productId,
+            sizeId: sizeId || null,
             variantId: variantId || null,
             quantity: Number(quantity),
             date,

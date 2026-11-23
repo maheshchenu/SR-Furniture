@@ -22,10 +22,11 @@ const billItemSchema = new mongoose.Schema(
       trim: true,
     },
 
-    variantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-    },
+    // Direct Size/Type reference for the current Category -> Company -> Model -> Size/Type flow.
+    sizeId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    sizeName: { type: String, default: "", trim: true },
+    // Historical bill compatibility.
+    variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
 
     variantName: {
       type: String,

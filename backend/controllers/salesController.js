@@ -170,29 +170,33 @@ const createBill = async (req, res) => {
         }
 
         let variant = null;
+        let size = null;
         let availableStock = 0;
         let variantName = "";
+        let sizeName = "";
         let color = "";
         let mrp = Number(product.mrp || 0);
         let purchasePrice = Number(product.purchasePrice || 0);
 
-        if (product.variants && product.variants.length > 0) {
-          if (
-            !variantId ||
-            !mongoose.Types.ObjectId.isValid(variantId)
-          ) {
-            throw new Error(`Please select a variant for ${product.name}`);
+        if (product.sizes && product.sizes.length > 0) {
+          const { sizeId } = item;
+          if (!sizeId || !mongoose.Types.ObjectId.isValid(sizeId)) {
+            throw new Error(`Please select a Size/Type for ${product.name}`);
           }
-
+          size = product.sizes.id(sizeId);
+          if (!size) throw new Error("Selected Size/Type not found");
+          availableStock = Number(size.quantity || 0);
+          sizeName = size.name || "";
+          mrp = Number(size.mrp || 0);
+          purchasePrice = Number(size.purchasePrice || 0);
+        } else if (product.variants && product.variants.length > 0) {
+          // Legacy products remain sellable; new products never create this level.
+          const { variantId } = item;
+          if (!variantId || !mongoose.Types.ObjectId.isValid(variantId)) throw new Error(`Please select a legacy variant for ${product.name}`);
           variant = product.variants.id(variantId);
-
-          if (!variant) {
-            throw new Error("Selected variant not found");
-          }
-
+          if (!variant) throw new Error("Selected legacy variant not found");
           availableStock = Number(variant.quantity || 0);
           variantName = variant.name || "";
-          color = variant.color || "";
           mrp = Number(variant.mrp || 0);
           purchasePrice = Number(variant.purchasePrice || 0);
         } else {
@@ -214,12 +218,11 @@ const createBill = async (req, res) => {
         const totalAmount = price * qty;
         const profit = (price - purchasePrice) * qty;
 
-        if (variant) {
-          variant.quantity -= qty;
-        } else {
-          product.quantity -= qty;
-        }
+        if (size) size.quantity -= qty;
+        else if (variant) variant.quantity -= qty;
+        else product.quantity -= qty;
 
+        product.markModified("sizes");
         product.markModified("variants");
         await product.save({ session });
 
@@ -231,6 +234,8 @@ const createBill = async (req, res) => {
           productId: product._id,
           productName: product.name,
           category: product.category,
+          sizeId: size ? size._id : null,
+          sizeName,
           variantId: variant ? variant._id : null,
           variantName,
           color,

@@ -24,7 +24,7 @@ const getToday = () => {
     .slice(0, 10);
 };
 
-const emptyVariant = () => ({
+const emptySize = () => ({
   name: "",
   warranty: "",
   mrp: "",
@@ -38,7 +38,7 @@ const createInitialForm = () => ({
   company: "",
   model: "",
   addedDate: getToday(),
-  variants: [emptyVariant()],
+  sizes: [emptySize()],
 });
 
 /* ------------------------------------------------------------------ */
@@ -65,11 +65,32 @@ const formatCurrency = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-const getStock = (product) => {
+const getProductStockRows = (product) => {
+  if (product.sizes?.length) {
+    return product.sizes.map((item) => ({
+      ...item,
+      stockType: "size",
+      stockId: item.id || item._id,
+    }));
+  }
+
   if (product.variants?.length) {
-    return product.variants.reduce(
-      (total, variant) =>
-        total + Number(variant.quantity || 0),
+    return product.variants.map((item) => ({
+      ...item,
+      stockType: "variant",
+      stockId: item.id || item._id,
+    }));
+  }
+
+  return [];
+};
+
+const getStock = (product) => {
+  const rows = getProductStockRows(product);
+
+  if (rows.length) {
+    return rows.reduce(
+      (total, item) => total + Number(item.quantity || 0),
       0
     );
   }
@@ -77,13 +98,15 @@ const getStock = (product) => {
   return Number(product.quantity || 0);
 };
 
-const hasLowStock = (product) =>
-  product.variants?.length
-    ? product.variants.some(
-        (variant) =>
-          Number(variant.quantity || 0) <= LOW_STOCK_LIMIT
+const hasLowStock = (product) => {
+  const rows = getProductStockRows(product);
+
+  return rows.length
+    ? rows.some(
+        (item) => Number(item.quantity || 0) <= LOW_STOCK_LIMIT
       )
     : Number(product.quantity || 0) <= LOW_STOCK_LIMIT;
+};
 
 /* ------------------------------------------------------------------ */
 /* Icons                                                               */
@@ -498,9 +521,11 @@ function Products() {
   const [stockFilter, setStockFilter] = useState("All");
 
   const [form, setForm] = useState(createInitialForm());
+  const [companyOptions, setCompanyOptions] = useState([]);
   const [editingProductId, setEditingProductId] = useState(null);
 
   const [stockTarget, setStockTarget] = useState(null);
+  const [stockSizeId, setStockSizeId] = useState("");
   const [stockVariantId, setStockVariantId] = useState("");
   const [stockQuantity, setStockQuantity] = useState("");
   const [stockDate, setStockDate] = useState(getToday());
@@ -509,6 +534,35 @@ function Products() {
   const [savingStock, setSavingStock] = useState(false);
   const [deletingProductId, setDeletingProductId] =
     useState(null);
+
+  // Load reusable companies for the selected category.
+  useEffect(() => {
+    if (!form.category) { setCompanyOptions([]); return; }
+    const baseUrl = import.meta.env.VITE_API_URL || "";
+    fetch(`${baseUrl}/api/companies?category=${encodeURIComponent(form.category)}`)
+      .then((response) => response.json())
+      .then((data) => setCompanyOptions((data.companies || []).map((company) => company.name)))
+      .catch(() => setCompanyOptions([]));
+  }, [form.category]);
+
+  const saveCompanyOption = async () => {
+    const name = form.company.trim();
+    if (!form.category.trim() || !name) return;
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${baseUrl}/api/companies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: form.category.trim(), name }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setCompanyOptions((previous) => [...new Set([...previous, name])].sort((a, b) => a.localeCompare(b)));
+      }
+    } catch (error) {
+      console.error("Unable to save company option:", error);
+    }
+  };
 
   // PRODUCT FORM CHANGE
   const handleProductChange = (e) => {
@@ -520,33 +574,33 @@ function Products() {
     }));
   };
 
-  // VARIANT FORM CHANGE
-  const handleVariantChange = (index, e) => {
+  // SIZE / TYPE FORM CHANGE
+  const handleSizeChange = (index, e) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
       ...prev,
-      variants: prev.variants.map((variant, i) =>
+      sizes: prev.sizes.map((size, i) =>
         i === index
-          ? { ...variant, [name]: value }
-          : variant
+          ? { ...size, [name]: value }
+          : size
       ),
     }));
   };
 
-  // ADD VARIANT ROW
-  const addVariantRow = () => {
+  // ADD SIZE / TYPE ROW
+  const addSizeRow = () => {
     setForm((prev) => ({
       ...prev,
-      variants: [...prev.variants, emptyVariant()],
+      sizes: [...prev.sizes, emptySize()],
     }));
   };
 
-  // REMOVE VARIANT ROW
-  const removeVariantRow = (index) => {
+  // REMOVE SIZE / TYPE ROW
+  const removeSizeRow = (index) => {
     setForm((prev) => ({
       ...prev,
-      variants: prev.variants.filter(
+      sizes: prev.sizes.filter(
         (_, i) => i !== index
       ),
     }));
@@ -576,28 +630,28 @@ function Products() {
       return;
     }
 
-    if (form.variants.length === 0) {
-      alert("Please add at least one product variant.");
+    if (form.sizes.length === 0) {
+      alert("Please add at least one Size / Type.");
       return;
     }
 
-    const invalidVariant = form.variants.some(
-      (variant) =>
-        !variant.name.trim() ||
-        variant.mrp === "" ||
-        variant.purchasePrice === "" ||
-        variant.sellingPrice === "" ||
-        variant.quantity === "" ||
-        Number(variant.mrp) < 0 ||
-        Number(variant.purchasePrice) < 0 ||
-        Number(variant.sellingPrice) <= 0 ||
-        !Number.isInteger(Number(variant.quantity)) ||
-        Number(variant.quantity) < 0
+    const invalidSize = form.sizes.some(
+      (size) =>
+        !size.name.trim() ||
+        size.mrp === "" ||
+        size.purchasePrice === "" ||
+        size.sellingPrice === "" ||
+        size.quantity === "" ||
+        Number(size.mrp) < 0 ||
+        Number(size.purchasePrice) < 0 ||
+        Number(size.sellingPrice) <= 0 ||
+        !Number.isInteger(Number(size.quantity)) ||
+        Number(size.quantity) < 0
     );
 
-    if (invalidVariant) {
+    if (invalidSize) {
       alert(
-        "Please complete every variant and enter valid prices and stock."
+        "Please complete every Size / Type and enter valid prices and stock."
       );
       return;
     }
@@ -609,14 +663,14 @@ function Products() {
       model: form.model.trim(),
       addedDate: form.addedDate,
 
-      variants: form.variants.map((variant) => ({
-        ...variant,
-        name: variant.name.trim(),
-        warranty: variant.warranty.trim(),
-        mrp: Number(variant.mrp),
-        purchasePrice: Number(variant.purchasePrice),
-        sellingPrice: Number(variant.sellingPrice),
-        quantity: Number(variant.quantity),
+      sizes: form.sizes.map((size) => ({
+        ...size,
+        name: size.name.trim(),
+        warranty: size.warranty.trim(),
+        mrp: Number(size.mrp),
+        purchasePrice: Number(size.purchasePrice),
+        sellingPrice: Number(size.sellingPrice),
+        quantity: Number(size.quantity),
       })),
     };
 
@@ -644,22 +698,31 @@ function Products() {
 
   // OPEN PRODUCT EDIT FORM
   const handleEditProduct = (product) => {
-    setEditingProductId(product.id);
+    // Prefer the new sizes[] structure. Fall back to legacy variants[].
+    const existingRows =
+      product.sizes?.length > 0
+        ? product.sizes
+        : product.variants || [];
+
+    const mappedSizes = existingRows.map((item) => ({
+      _id: item.id || item._id,
+      name: item.name || "",
+      warranty: item.warranty || "",
+      mrp: String(item.mrp ?? ""),
+      purchasePrice: String(item.purchasePrice ?? ""),
+      sellingPrice: String(item.sellingPrice ?? ""),
+      quantity: String(item.quantity ?? 0),
+    }));
+
+    setEditingProductId(product.id || product._id);
     setForm({
       category: product.category || "",
       company: product.company || "",
       model: product.model || "",
       addedDate: product.addedDate || getToday(),
-      variants: (product.variants || []).map((variant) => ({
-        _id: variant.id || variant._id,
-        name: variant.name || "",
-        warranty: variant.warranty || "",
-        mrp: String(variant.mrp ?? ""),
-        purchasePrice: String(variant.purchasePrice ?? ""),
-        sellingPrice: String(variant.sellingPrice ?? ""),
-        quantity: String(variant.quantity ?? 0),
-      })),
+      sizes: mappedSizes.length > 0 ? mappedSizes : [emptySize()],
     });
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -669,19 +732,25 @@ function Products() {
   };
 
   // OPEN STOCK MODAL
-  const openStockModal = (product, variantId) => {
+  const openStockModal = (product, itemId, itemType) => {
+    const rows = getProductStockRows(product);
+    const defaultRow = itemId
+      ? rows.find((item) => String(item.stockId) === String(itemId))
+      : rows[0];
+
+    const selectedRow = defaultRow || rows[0] || null;
+
     setStockTarget(product);
-
-    if (variantId !== undefined && variantId !== null) {
-      setStockVariantId(String(variantId));
-    } else {
-      setStockVariantId(
-        product.variants?.length
-          ? String(product.variants[0].id)
-          : ""
-      );
-    }
-
+    setStockSizeId(
+      selectedRow?.stockType === "size"
+        ? String(selectedRow.stockId)
+        : ""
+    );
+    setStockVariantId(
+      selectedRow?.stockType === "variant"
+        ? String(selectedRow.stockId)
+        : ""
+    );
     setStockQuantity("");
     setStockDate(getToday());
   };
@@ -689,6 +758,7 @@ function Products() {
   // CLOSE STOCK MODAL
   const closeStockModal = () => {
     setStockTarget(null);
+    setStockSizeId("");
     setStockVariantId("");
     setStockQuantity("");
     setStockDate(getToday());
@@ -710,12 +780,23 @@ function Products() {
       return;
     }
 
+    const stockRows = getProductStockRows(stockTarget);
+    if (
+      stockRows.length > 0 &&
+      !stockSizeId &&
+      !stockVariantId
+    ) {
+      alert("Please select a Size / Type.");
+      return;
+    }
+
     try {
       setSavingStock(true);
 
       const result = await addStock({
-        productId: stockTarget.id,
-        variantId: stockVariantId,
+        productId: stockTarget.id || stockTarget._id,
+        sizeId: stockSizeId || null,
+        variantId: stockVariantId || null,
         quantity: stockQuantity,
         date: stockDate,
       });
@@ -772,9 +853,9 @@ function Products() {
         product.category,
         product.company,
         product.model,
-        ...(product.variants || []).flatMap((variant) => [
-          variant.name,
-          variant.warranty,
+        ...getProductStockRows(product).flatMap((item) => [
+          item.name,
+          item.warranty,
         ]),
       ]
         .filter(Boolean)
@@ -806,17 +887,20 @@ function Products() {
     const items = [];
 
     products.forEach((product) => {
-      if (product.variants?.length) {
-        product.variants.forEach((variant) => {
-          const quantity = Number(variant.quantity || 0);
+      const rows = getProductStockRows(product);
+
+      if (rows.length) {
+        rows.forEach((item) => {
+          const quantity = Number(item.quantity || 0);
 
           if (quantity <= LOW_STOCK_LIMIT) {
             items.push({
-              key: `${product.id}-${variant.id}`,
+              key: `${product.id}-${item.stockType}-${item.stockId}`,
               product,
-              variantId: variant.id,
+              sizeId: item.stockType === "size" ? item.stockId : null,
+              variantId: item.stockType === "variant" ? item.stockId : null,
               productName: product.name,
-              variantLabel: [variant.name, variant.warranty]
+              sizeLabel: [item.name, item.warranty]
                 .filter(Boolean)
                 .join(" · "),
               quantity,
@@ -830,18 +914,17 @@ function Products() {
           items.push({
             key: `${product.id}`,
             product,
+            sizeId: null,
             variantId: null,
             productName: product.name,
-            variantLabel: "",
+            sizeLabel: "",
             quantity,
           });
         }
       }
     });
 
-    return items.sort(
-      (a, b) => a.quantity - b.quantity
-    );
+    return items.sort((a, b) => a.quantity - b.quantity);
   }, [products]);
 
   const outOfStockCount = lowStockItems.filter(
@@ -853,61 +936,45 @@ function Products() {
     0
   );
 
-  const variantCount = products.reduce(
+  const sizeCount = products.reduce(
     (total, product) =>
-      total + (product.variants?.length || 0),
+      total + (product.sizes?.length || 0),
     0
   );
 
   // TOTAL PURCHASE VALUE OF CURRENT STOCK
-  const totalPurchaseValue = products.reduce(
-    (total, product) => {
-      if (product.variants?.length) {
-        return (
-          total +
-          product.variants.reduce(
-            (sum, variant) =>
-              sum +
-              Number(variant.purchasePrice || 0) *
-                Number(variant.quantity || 0),
-            0
-          )
-        );
-      }
+  const totalPurchaseValue = products.reduce((total, product) => {
+    const rows = getProductStockRows(product);
 
-      return (
-        total +
-        Number(product.purchasePrice || 0) *
-          Number(product.quantity || 0)
+    if (rows.length) {
+      return total + rows.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.purchasePrice || 0) * Number(item.quantity || 0),
+        0
       );
-    },
-    0
-  );
+    }
+
+    return total +
+      Number(product.purchasePrice || 0) * Number(product.quantity || 0);
+  }, 0);
 
   // TOTAL SELLING VALUE OF CURRENT STOCK
-  const totalSellingValue = products.reduce(
-    (total, product) => {
-      if (product.variants?.length) {
-        return (
-          total +
-          product.variants.reduce(
-            (sum, variant) =>
-              sum +
-              Number(variant.sellingPrice || 0) *
-                Number(variant.quantity || 0),
-            0
-          )
-        );
-      }
+  const totalSellingValue = products.reduce((total, product) => {
+    const rows = getProductStockRows(product);
 
-      return (
-        total +
-        Number(product.sellingPrice || 0) *
-          Number(product.quantity || 0)
+    if (rows.length) {
+      return total + rows.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.sellingPrice || 0) * Number(item.quantity || 0),
+        0
       );
-    },
-    0
-  );
+    }
+
+    return total +
+      Number(product.sellingPrice || 0) * Number(product.quantity || 0);
+  }, 0);
 
   return (
     <div className="relative min-h-screen space-y-7 bg-[#FFFDF5] p-1 sm:space-y-8 sm:p-2">
@@ -939,7 +1006,7 @@ function Products() {
               </h1>
 
               <p className="mt-2 max-w-md text-sm text-[#D5E6D9]">
-                Manage furniture, categories, variants and stock.
+                Manage furniture, categories, sizes and stock.
               </p>
             </div>
           </div>
@@ -993,11 +1060,11 @@ function Products() {
           <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-sm font-semibold text-[#001F0B]/70">
-                Total Variants
+                Total Size / Type
               </p>
 
               <h2 className="mt-3 text-4xl font-extrabold tabular-nums text-[#001F0B]">
-                {variantCount}
+                {sizeCount}
               </h2>
 
               <p className="mt-1 text-xs font-medium text-[#001F0B]/60">
@@ -1132,9 +1199,9 @@ function Products() {
                     {item.productName}
                   </p>
 
-                  {item.variantLabel && (
+                  {item.sizeLabel && (
                     <p className="mt-0.5 truncate text-[11px] font-medium text-[#6B7A6F]">
-                      {item.variantLabel}
+                      {item.sizeLabel}
                     </p>
                   )}
 
@@ -1154,7 +1221,11 @@ function Products() {
                 <button
                   type="button"
                   onClick={() =>
-                    openStockModal(item.product, item.variantId)
+                    openStockModal(
+                      item.product,
+                      item.sizeId || item.variantId,
+                      item.variantId ? "variant" : "size"
+                    )
                   }
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-b from-[#0A4F24] to-[#003B16] px-3.5 py-2.5 text-xs font-bold text-[#FFD75A] shadow-sm ring-1 ring-[#DFA900]/30 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30"
                 >
@@ -1191,7 +1262,7 @@ function Products() {
               <p className="mt-1 text-xs text-[#6B7A6F]">
                 {editingProductId
                   ? "Edit product details, prices, warranty or correct stock quantity."
-                  : "Select category, company, model and create variants."}
+                  : "Select category, company, model and create sizes."}
               </p>
             </div>
           </div>
@@ -1240,10 +1311,15 @@ function Products() {
                   name="company"
                   value={form.company}
                   onChange={handleProductChange}
-                  placeholder="Enter company name"
+                  onBlur={saveCompanyOption}
+                  list="sr-furniture-company-options"
+                  placeholder="Enter or select company name"
                   className={inputClass}
                   required
                 />
+                <datalist id="sr-furniture-company-options">
+                  {companyOptions.map((company) => <option key={company} value={company} />)}
+                </datalist>
               </div>
 
               <div>
@@ -1286,12 +1362,12 @@ function Products() {
           <div className="border-t border-[#EFE8CF] pt-8">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <SectionTitle hint="Add different sizes or types with separate prices and stock.">
-                Product Variants
+                Product Size / Type
               </SectionTitle>
 
               <button
                 type="button"
-                onClick={addVariantRow}
+                onClick={addSizeRow}
                 className={buttonClass}
               >
                 <Icon
@@ -1299,12 +1375,12 @@ function Products() {
                   className="h-4 w-4"
                   strokeWidth={3}
                 />
-                Add Variant
+                Add Size / Type
               </button>
             </div>
 
             <div className="space-y-5">
-              {form.variants.map((variant, index) => (
+              {form.sizes.map((size, index) => (
                 <div
                   key={index}
                   className="relative rounded-2xl border border-[#E6DEC3] bg-gradient-to-br from-[#FFFBEA] to-[#FFFDF5] p-4 shadow-sm transition duration-200 hover:border-[#DFA900]/60 hover:shadow-md sm:p-6"
@@ -1316,14 +1392,14 @@ function Products() {
                       </span>
 
                       <h4 className="text-sm font-extrabold text-[#003B16]">
-                        Variant {index + 1}
+                        Size / Type {index + 1}
                       </h4>
                     </div>
 
-                    {form.variants.length > 1 && (
+                    {form.sizes.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => removeVariantRow(index)}
+                        onClick={() => removeSizeRow(index)}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50"
                       >
                         <Icon
@@ -1343,9 +1419,9 @@ function Products() {
 
                       <input
                         name="name"
-                        value={variant.name}
+                        value={size.name}
                         onChange={(e) =>
-                          handleVariantChange(index, e)
+                          handleSizeChange(index, e)
                         }
                         placeholder="Example: Queen / King / 3 Seater"
                         className={inputClass}
@@ -1360,9 +1436,9 @@ function Products() {
 
                       <input
                         name="warranty"
-                        value={variant.warranty}
+                        value={size.warranty}
                         onChange={(e) =>
-                          handleVariantChange(index, e)
+                          handleSizeChange(index, e)
                         }
                         placeholder="Example: 1 years"
                         className={inputClass}
@@ -1392,9 +1468,9 @@ function Products() {
                         <input
                           type="number"
                           name={field.name}
-                          value={variant[field.name]}
+                          value={size[field.name]}
                           onChange={(e) =>
-                            handleVariantChange(index, e)
+                            handleSizeChange(index, e)
                           }
                           placeholder={`Enter ${field.label}`}
                           min="0"
@@ -1637,13 +1713,13 @@ function Products() {
                 </div>
 
                 {/* VARIANT TABLE */}
-                {product.variants?.length > 0 ? (
+                {getProductStockRows(product).length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[650px] text-left text-sm">
                       <thead className="bg-gradient-to-r from-[#001F0B] to-[#003B16] text-xs font-semibold tracking-wide text-[#FFD75A]">
                         <tr>
                           <th className="px-4 py-4">
-                            Variant / Size
+                            Size / Type
                           </th>
                           <th className="px-4 py-4">Warranty</th>
                           <th className="px-4 py-4">MRP</th>
@@ -1654,9 +1730,9 @@ function Products() {
                       </thead>
 
                       <tbody className="divide-y divide-[#F0EAD3]">
-                        {product.variants.map((variant) => {
+                        {product.sizes.map((size) => {
                           const qty = Number(
-                            variant.quantity || 0
+                            size.quantity || 0
                           );
 
                           const badgeClass =
@@ -1668,34 +1744,34 @@ function Products() {
 
                           return (
                             <tr
-                              key={variant.id}
+                              key={size.stockId}
                               className="transition-colors odd:bg-white even:bg-[#FFFDF5] hover:bg-[#FFF8E1]"
                             >
                               <td className="px-4 py-4 font-bold text-[#003B16]">
-                                {variant.name}
+                                {size.name}
                               </td>
 
                               <td className="px-4 py-4 text-[#6B7A6F]">
-                                {variant.warranty || "-"}
+                                {size.warranty || "-"}
                               </td>
 
                               <td className="px-4 py-4 tabular-nums text-[#6B7A6F]">
-                                ₹{variant.mrp}
+                                ₹{size.mrp}
                               </td>
 
                               <td className="px-4 py-4 tabular-nums text-[#6B7A6F]">
-                                ₹{variant.purchasePrice}
+                                ₹{size.purchasePrice}
                               </td>
 
                               <td className="px-4 py-4 font-bold tabular-nums text-[#003B16]">
-                                ₹{variant.sellingPrice}
+                                ₹{size.sellingPrice}
                               </td>
 
                               <td className="px-4 py-4">
                                 <span
                                   className={`inline-flex min-w-12 justify-center rounded-full px-3 py-1.5 text-xs font-extrabold ${badgeClass}`}
                                 >
-                                  {variant.quantity}
+                                  {size.quantity}
                                 </span>
 
                                 {qty <= LOW_STOCK_LIMIT && (
@@ -1735,7 +1811,7 @@ function Products() {
                             className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#EFE8CF] bg-[#FFFBEA] px-4 py-3 text-xs"
                           >
                             <span className="font-bold text-[#003B16]">
-                              {entry.variantName}
+                              {entry.sizeName}
                             </span>
 
                             <span className="font-extrabold text-[#0E5A2A]">
@@ -1800,26 +1876,35 @@ function Products() {
               onSubmit={handleAddStock}
               className="space-y-5 p-5 sm:p-7"
             >
-              {stockTarget.variants?.length > 0 && (
+              {getProductStockRows(stockTarget).length > 0 && (
                 <div>
                   <label className={labelClass}>
-                    Select Product Variant *
+                    Select Size / Type *
                   </label>
 
                   <SelectField
-                    value={stockVariantId}
-                    onChange={(e) =>
-                      setStockVariantId(e.target.value)
-                    }
+                    value={stockSizeId || stockVariantId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selected = getProductStockRows(stockTarget).find(
+                        (item) => String(item.stockId) === String(selectedId)
+                      );
+
+                      setStockSizeId(
+                        selected?.stockType === "size" ? selectedId : ""
+                      );
+                      setStockVariantId(
+                        selected?.stockType === "variant" ? selectedId : ""
+                      );
+                    }}
                     required
                   >
-                    {stockTarget.variants.map((variant) => (
+                    {getProductStockRows(stockTarget).map((item) => (
                       <option
-                        key={variant.id}
-                        value={variant.id}
+                        key={`${item.stockType}-${item.stockId}`}
+                        value={item.stockId}
                       >
-                        {variant.name} · Current Stock:{" "}
-                        {variant.quantity}
+                        {item.name} · Current Stock: {item.quantity}
                       </option>
                     ))}
                   </SelectField>

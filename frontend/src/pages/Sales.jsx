@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useProducts } from "../context/ProductContext";
 import { useCategories } from "../context/CategoryContext";
-import logo from "../assets/logo2.png";
+import logo from "../assets/logo.jpg";
 
 const money = (amount) =>
   `₹${Number(amount || 0).toLocaleString("en-IN", {
@@ -102,9 +102,32 @@ const LOW_STOCK_LIMIT = 2;
 const isLowStock = (quantity) =>
   Number(quantity) > 0 && Number(quantity) <= LOW_STOCK_LIMIT;
 
-// Size of a variant (falls back to variant name)
+// Size / Type helpers (legacy products are displayed as a flat Size / Type list)
 const getVariantLabel = (variant) =>
-  String(variant?.size || variant?.name || variant?.variantName || "").trim();
+  String(variant?.name || variant?.variantName || "").trim();
+
+const getSizeLabel = (size) =>
+  String(size?.name || size?.size || size?.label || "").trim();
+
+const getVariantSizes = (variant) =>
+  Array.isArray(variant?.sizes) && variant.sizes.length
+    ? variant.sizes
+    : variant
+      ? [{ ...variant, id: variant.id, name: variant.size || variant.name, _legacy: true }]
+      : [];
+
+const getVariantAvailableStock = (variant) =>
+  getVariantSizes(variant).reduce(
+    (total, size) => total + Math.max(0, Number(size.quantity || 0)),
+    0
+  );
+
+const getProductAvailableStock = (product) =>
+  Array.isArray(product?.sizes) && product.sizes.length
+    ? product.sizes.reduce((total, size) => total + Math.max(0, Number(size.quantity || 0)), 0)
+    : Array.isArray(product?.variants) && product.variants.length
+      ? product.variants.reduce((total, variant) => total + getVariantAvailableStock(variant), 0)
+      : Math.max(0, Number(product?.quantity || 0));
 
 /* ------------------------------------------------------------------ */
 /* Icons                                                               */
@@ -298,7 +321,7 @@ function Sales() {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [modelSearch, setModelSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
 
   const [cart, setCart] = useState([]);
 
@@ -397,11 +420,8 @@ function Sales() {
           String(selectedCategory.label).toLowerCase() ||
         String(categoryId || "") === String(selectedCategory.value);
 
-      // Hide products that have no stock available. For size-based products,
-      // show the product only when at least one variant has stock.
-      const hasStock = Array.isArray(product.variants) && product.variants.length > 0
-        ? product.variants.some((variant) => Number(variant.quantity || 0) > 0)
-        : Number(product.quantity || 0) > 0;
+      // Show a model only when at least one in-stock Size / Type exists.
+      const hasStock = getProductAvailableStock(product) > 0;
 
       return categoryMatches && hasStock;
     });
@@ -444,10 +464,22 @@ function Sales() {
     [modelProducts]
   );
 
-  // Step 4: sizes (variants) of the selected model
-  const variants = (selectedProduct?.variants || []).filter(
-    (variant) => Number(variant.quantity || 0) > 0
-  );
+  // Step 4: direct Size / Type rows under the selected Model.
+  // Older products stored stock in variants; expose those as flat legacy Size / Type choices.
+  const sizes = useMemo(() => {
+    if (selectedProduct?.sizes?.length) return selectedProduct.sizes
+      .filter((size) => Number(size.quantity || 0) > 0)
+      .map((size) => ({ ...size, _legacyVariant: false }));
+
+    return (selectedProduct?.variants || [])
+      .filter((variant) => Number(variant.quantity || 0) > 0)
+      .map((variant) => ({
+        ...variant,
+        id: variant.id,
+        name: variant.name || variant.variantName || "Legacy Size / Type",
+        _legacyVariant: true,
+      }));
+  }, [selectedProduct]);
 
   const sortedSales = useMemo(() => {
     return [...sales].sort(
@@ -518,7 +550,11 @@ function Sales() {
         bill.billNumber,
         bill.customerName,
         bill.customerMobile,
-        ...(bill.items || []).map((item) => item.productName || item.name),
+        ...(bill.items || []).flatMap((item) => [
+          item.productName || item.name,
+          item.variantName,
+          item.sizeName,
+        ]),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
@@ -530,7 +566,7 @@ function Sales() {
     setSelectedCompany(null);
     setModelSearch("");
     setSelectedProduct(null);
-    setSelectedVariant(null);
+    setSelectedSize(null);
   };
 
   const handleCategorySelect = (option) => {
@@ -552,7 +588,7 @@ function Sales() {
     setCompanySearch(option.label);
     setModelSearch("");
     setSelectedProduct(null);
-    setSelectedVariant(null);
+    setSelectedSize(null);
     setMessage("");
   };
 
@@ -561,7 +597,7 @@ function Sales() {
     setSelectedCompany(null);
     setModelSearch("");
     setSelectedProduct(null);
-    setSelectedVariant(null);
+    setSelectedSize(null);
     setMessage("");
   };
 
@@ -573,42 +609,44 @@ function Sales() {
   const handleModelSearch = (value) => {
     setModelSearch(value);
     setSelectedProduct(null);
-    setSelectedVariant(null);
+    setSelectedSize(null);
     setMessage("");
   };
 
-  const addToCart = (product, variant = null) => {
-    const variantId = variant?.id ?? null;
-
-    const availableStock = Number(variant ? variant.quantity : product.quantity);
+  const addToCart = (product, size = null) => {
+    const legacyVariant = Boolean(size?._legacyVariant);
+    const variantId = legacyVariant ? (size?.id ?? null) : null;
+    const sizeId = legacyVariant ? null : (size?.id ?? null);
+    const selectedStockRecord = size;
+    const availableStock = Number(
+      selectedStockRecord ? selectedStockRecord.quantity : product.quantity
+    );
 
     if (availableStock <= 0) {
-      setMessage("This product is out of stock.");
+      setMessage("This product size is out of stock.");
       return;
     }
 
-    if (isLowStock(availableStock)) {
-      const sizeLabel = getVariantLabel(variant);
+    const sizeLabel = size ? getSizeLabel(size) : "";
+    const variantLabel = "";
 
+    if (isLowStock(availableStock)) {
       setStockWarning(
         `Low stock: only ${availableStock} left for ${getProductModel(product)}${
-          sizeLabel ? ` (${sizeLabel})` : ""
-        }.`
+          variantLabel ? ` (${variantLabel})` : ""
+        }${sizeLabel ? ` - ${sizeLabel}` : ""}.`
       );
     } else {
       setStockWarning("");
     }
 
-    const key = `${product.id}-${variantId ?? "simple"}`;
-
-    const mrp = Number(variant?.mrp ?? product.mrp ?? 0);
-
+    const key = `${product.id}-${sizeId ?? "simple"}`;
+    const mrp = Number(size?.mrp ?? product.mrp ?? 0);
     const purchasePrice = Number(
-      variant?.purchasePrice ?? product.purchasePrice ?? 0
+      size?.purchasePrice ?? product.purchasePrice ?? 0
     );
-
     const sellingPrice = Number(
-      variant?.sellingPrice ?? product.sellingPrice ?? 0
+      size?.sellingPrice ?? product.sellingPrice ?? 0
     );
 
     setCart((previousCart) => {
@@ -631,11 +669,15 @@ function Sales() {
           key,
           productId: product.id,
           variantId,
+          sizeId,
           productName: product.name,
           category: selectedCategory?.label || "",
           company: selectedCompany?.label || getProductCompany(product),
-          variantName: getVariantLabel(variant),
-          color: variant?.color || "",
+          modelName: getProductModel(product),
+          variantName: variantLabel,
+          sizeName: sizeLabel,
+          color: "",
+          warranty: size?.warranty ?? "",
           mrp,
           purchasePrice,
           sellingPrice,
@@ -650,34 +692,23 @@ function Sales() {
 
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
-    setSelectedVariant(null);
+    setSelectedSize(null);
     setMessage("");
-
-    if (!product.variants || product.variants.length === 0) {
-      addToCart(product);
-    }
+    if (!product.sizes?.length && !product.variants?.length) addToCart(product);
   };
 
-  const handleVariantSelect = (variant) => {
-    setSelectedVariant(variant);
-
-    if (selectedProduct) {
-      addToCart(selectedProduct, variant);
-    }
+  const handleSizeSelect = (size) => {
+    setSelectedSize(size);
+    if (selectedProduct) addToCart(selectedProduct, size);
   };
 
-  // Size is optional: add the model itself without choosing a size
-  const handleAddWithoutSize = () => {
+  // Legacy products without a Size / Type list can still use product-level stock.
+  const handleAddWithoutVariant = () => {
     if (!selectedProduct) return;
-
     if (Number(selectedProduct.quantity || 0) <= 0) {
-      setMessage(
-        "Stock for this model is tracked per size. Please select a size."
-      );
+      setMessage("This model uses Size / Type stock. Please select an in-stock Size / Type.");
       return;
     }
-
-    setSelectedVariant(null);
     addToCart(selectedProduct);
   };
 
@@ -792,7 +823,8 @@ function Sales() {
         date: billDate,
         items: cart.map((item) => ({
           productId: item.productId,
-          variantId: item.variantId,
+          variantId: item.variantId || null,
+          sizeId: item.sizeId || null,
           quantity: item.quantity,
           sellingPrice: Number(item.sellingPrice),
         })),
@@ -858,6 +890,28 @@ function Sales() {
       window.onafterprint = null;
     };
     window.setTimeout(() => window.print(), 100);
+  };
+
+  // Print every customer bill and every product in the sales history.
+  const printAllSalesReport = () => {
+    if (!sortedSales.length) {
+      setMessage("There are no sales bills available to print.");
+      return;
+    }
+
+    document.body.classList.remove(
+      "print-customer",
+      "print-business",
+      "print-sales-report"
+    );
+    document.body.classList.add("print-sales-report");
+
+    window.onafterprint = () => {
+      document.body.classList.remove("print-sales-report");
+      window.onafterprint = null;
+    };
+
+    window.setTimeout(() => window.print(), 150);
   };
 
   const exportSalesExcel = () => {
@@ -944,7 +998,7 @@ function Sales() {
         @media print {
           @page {
             size: A4;
-            margin: 0;
+            margin: 6mm;
           }
 
           .sales-root {
@@ -978,6 +1032,178 @@ function Sales() {
           body.print-business .business-print,
           body.print-business .business-print * {
             visibility: visible !important;
+          }
+
+          body.print-sales-report * {
+            visibility: hidden !important;
+          }
+
+          body.print-sales-report .sales-report-print,
+          body.print-sales-report .sales-report-print * {
+            visibility: visible !important;
+          }
+
+          /* Print only the report: hide the normal Sales page layout completely.
+             visibility:hidden alone keeps its layout height and creates blank sheets. */
+          body.print-sales-report .sales-root {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            zoom: 1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          body.print-sales-report #root {
+            min-height: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+
+          /* The report is nested inside the page content wrapper. Keep that
+             wrapper's children in the print tree, but remove every sibling
+             except the report itself. The previous direct-child selector hid
+             the wrapper containing the report, producing a completely blank page. */
+          body.print-sales-report .sales-root > .relative.space-y-6 {
+            display: contents !important;
+          }
+
+          body.print-sales-report .sales-root > .relative.space-y-6 > :not(.sales-report-print) {
+            display: none !important;
+          }
+
+          body.print-sales-report .sales-report-print {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            color: #111 !important;
+            overflow: visible !important;
+            font-size: 7.5pt !important;
+            line-height: 1.15 !important;
+          }
+
+          body.print-sales-report .sales-report-print > div:first-child {
+            margin-bottom: 3mm !important;
+            padding-bottom: 2mm !important;
+          }
+
+          body.print-sales-report .sales-report-print > div:nth-child(2) {
+            margin-bottom: 3mm !important;
+            gap: 2mm !important;
+            font-size: 8pt !important;
+          }
+
+          body.print-sales-report .sales-report-print img {
+            width: 14mm !important;
+            height: 14mm !important;
+          }
+
+          body.print-sales-report .sales-report-bill {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            margin: 0 0 2mm !important;
+            padding: 0 0 1mm !important;
+            border-bottom: 1px dashed #999 !important;
+          }
+
+          body.print-sales-report .sales-report-bill .sales-report-page-title {
+            margin-bottom: 1mm !important;
+            padding-bottom: 1mm !important;
+            gap: 2mm !important;
+          }
+
+          body.print-sales-report .sales-report-bill h3 {
+            font-size: 9pt !important;
+            line-height: 1.15 !important;
+            margin: 0 !important;
+          }
+
+          body.print-sales-report .sales-report-bill p,
+          body.print-sales-report .sales-report-bill .text-xs {
+            font-size: 7pt !important;
+            line-height: 1.15 !important;
+            margin-top: 1px !important;
+          }
+
+          body.print-sales-report .sales-report-bill table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 7pt !important;
+            line-height: 1.1 !important;
+            margin: 1mm 0 !important;
+          }
+
+          body.print-sales-report .sales-report-bill thead {
+            display: table-header-group !important;
+          }
+
+          body.print-sales-report .sales-report-bill tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          body.print-sales-report .sales-report-bill th,
+          body.print-sales-report .sales-report-bill td {
+            border: 1px solid #b8b8b8 !important;
+            padding: 2px 3px !important;
+            vertical-align: top !important;
+          }
+
+          body.print-sales-report .sales-report-totals {
+            display: grid !important;
+            grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+            width: 100% !important;
+            margin: 1mm 0 0 !important;
+            gap: 2mm !important;
+            font-size: 6.5pt !important;
+            line-height: 1.15 !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 1mm !important;
+            white-space: nowrap !important;
+            border-top: 1px solid #ccc !important;
+            padding-top: 1mm !important;
+          }
+
+          body.print-sales-report .sales-report-bill .mt-2 {
+            margin-top: 1mm !important;
+          }
+
+          body.print-sales-report .sales-report-bill .py-0\.5 {
+            padding-top: 1px !important;
+            padding-bottom: 1px !important;
+          }
+
+          body.print-sales-report .sales-report-bill .py-1 {
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+          }
+
+          body.print-sales-report .sales-report-page-title {
+            break-after: avoid !important;
+            page-break-after: avoid !important;
+          }
+
+          body.print-sales-report .sales-report-print > div:last-child {
+            margin-top: 2mm !important;
+            padding-top: 1mm !important;
           }
 
           body.print-customer .customer-print,
@@ -1185,7 +1411,7 @@ function Sales() {
                 </h2>
 
                 <p className="mt-1 text-sm text-[#6B7A6F]">
-                  Category → Company → Model → Size
+                  Category → Company → Model → Size / Type
                 </p>
               </div>
 
@@ -1242,144 +1468,29 @@ function Sales() {
               </p>
             )}
 
-            {/* SIZES - shown automatically once a model is picked */}
-            {selectedProduct && variants.length > 0 && (
+            {/* DIRECT SIZE / TYPE selection under the selected Model */}
+            {selectedProduct && sizes.length > 0 && (
               <div className="mt-6 border-t border-[#EFE8CF] pt-5">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-extrabold text-[#003B16]">
-                      {getProductModel(selectedProduct)} - Sizes
-                    </h3>
-                    <p className="text-xs text-[#6B7A6F]">
-                      Tap a size to add it to the cart. Size is optional.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddWithoutSize}
-                    className={`${greenButtonClass} shrink-0`}
-                  >
-                    <Icon name="plus" className="h-4 w-4" strokeWidth={3} />
-                    Add without size
-                  </button>
-                </div>
-
+                <h3 className="mb-3 text-lg font-extrabold text-[#003B16]">{getProductModel(selectedProduct)} - Select Size / Type</h3>
+                <p className="mb-3 text-xs text-[#6B7A6F]">Only in-stock Size / Type options are shown.</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {variants.map((variant, index) => {
-                    const isSelected =
-                      String(selectedVariant?.id) === String(variant.id);
-
-                    const quantity = Number(variant.quantity || 0);
-                    const outOfStock = quantity <= 0;
+                  {sizes.map((size, index) => {
+                    const quantity = Number(size.quantity || 0);
                     const lowStock = isLowStock(quantity);
-
                     return (
-                      <button
-                        type="button"
-                        key={variant.id ?? index}
-                        onClick={() => handleVariantSelect(variant)}
-                        className={`group rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 ${
-                          isSelected
-                            ? "border-[#DFA900] bg-gradient-to-br from-[#FFF8E1] to-[#FFF1C2] shadow-md"
-                            : lowStock
-                              ? "border-amber-300 bg-amber-50/60 hover:border-amber-400"
-                              : "border-[#E6DEC3] bg-white hover:border-[#DFA900]/70 hover:bg-[#FFFBEA]"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-base font-extrabold text-[#003B16]">
-                            {getVariantLabel(variant) || "Size"}
-                          </h4>
-
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                              outOfStock
-                                ? "bg-red-50 text-red-600"
-                                : lowStock
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-[#E4F1E6] text-[#0E5A2A]"
-                            }`}
-                          >
-                            {outOfStock
-                              ? "Out of stock"
-                              : lowStock
-                                ? `Only ${quantity} left`
-                                : `Stock: ${quantity}`}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 text-sm text-[#6B7A6F]">
-                          Color: {variant.color || "-"}
-                        </p>
-
-                        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                          <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
-                            MRP: {money(variant.mrp)}
-                          </span>
-
-                          <span className="rounded-lg bg-green-50 px-2.5 py-1 font-semibold text-green-700">
-                            Selling: {money(variant.sellingPrice)}
-                          </span>
-                        </div>
-
-                        {lowStock && (
-                          <p className="mt-3 flex items-center gap-1.5 text-xs font-bold text-amber-700">
-                            <Icon name="alert" className="h-3.5 w-3.5" />
-                            Warning: stock is almost finished
-                          </p>
-                        )}
-
-                        <p className="mt-3 flex items-center gap-1.5 text-sm font-bold text-[#B58A00] transition-all group-hover:gap-2.5">
-                          Add to Cart
-                          <Icon
-                            name="plus"
-                            className="h-3.5 w-3.5"
-                            strokeWidth={3}
-                          />
-                        </p>
+                      <button type="button" key={size.id ?? `${getSizeLabel(size)}-${index}`} onClick={() => handleSizeSelect(size)} className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg ${lowStock ? "border-amber-300 bg-amber-50/60" : "border-[#E6DEC3] bg-white hover:border-[#DFA900]/70"}`}>
+                        <div className="flex items-center justify-between gap-2"><h4 className="font-extrabold text-[#003B16]">{getSizeLabel(size) || "Size / Type"}</h4><span className="rounded-full bg-[#E4F1E6] px-2.5 py-1 text-xs font-bold text-[#0E5A2A]">{lowStock ? `Only ${quantity} left` : `Stock: ${quantity}`}</span></div>
+                        {size.warranty ? <p className="mt-1 text-xs text-[#6B7A6F]">Warranty: {size.warranty}</p> : null}
+                        <div className="mt-3 flex flex-wrap gap-2 text-sm"><span className="rounded-lg bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">MRP: {money(size.mrp ?? selectedProduct.mrp)}</span><span className="rounded-lg bg-green-50 px-2.5 py-1 font-semibold text-green-700">Selling: {money(size.sellingPrice ?? selectedProduct.sellingPrice)}</span></div>
+                        <p className="mt-3 text-sm font-bold text-[#B58A00]">Add to Cart</p>
                       </button>
                     );
                   })}
                 </div>
               </div>
             )}
-
-            {selectedProduct && variants.length === 0 && (
-              <div
-                className={`mt-6 flex items-center gap-3 rounded-2xl border p-4 ${
-                  isLowStock(selectedProduct.quantity)
-                    ? "border-amber-300 bg-amber-50"
-                    : "border-green-200 bg-green-50"
-                }`}
-              >
-                <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white ${
-                    isLowStock(selectedProduct.quantity)
-                      ? "bg-amber-500"
-                      : "bg-green-600"
-                  }`}
-                >
-                  <Icon
-                    name={isLowStock(selectedProduct.quantity) ? "alert" : "check"}
-                    className="h-4 w-4"
-                    strokeWidth={3}
-                  />
-                </span>
-                <p
-                  className={`text-base font-semibold ${
-                    isLowStock(selectedProduct.quantity)
-                      ? "text-amber-800"
-                      : "text-green-800"
-                  }`}
-                >
-                  {getProductModel(selectedProduct)} has no sizes and was added
-                  to cart.
-                  {isLowStock(selectedProduct.quantity)
-                    ? ` Only ${selectedProduct.quantity} left in stock.`
-                    : ""}
-                </p>
-              </div>
+            {selectedProduct && sizes.length === 0 && !selectedProduct.sizes?.length && Number(selectedProduct.quantity || 0) > 0 && (
+              <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4"><p className="font-semibold text-green-800">{getProductModel(selectedProduct)} has product-level stock.</p><button type="button" onClick={handleAddWithoutVariant} className={`${greenButtonClass} mt-3`}><Icon name="plus" className="h-4 w-4" />Add to Cart</button></div>
             )}
           </section>
 
@@ -1515,6 +1626,7 @@ function Sales() {
                               {item.category}
                               {item.company ? ` • ${item.company}` : ""}
                               {item.variantName ? ` • ${item.variantName}` : ""}
+                              {item.sizeName ? ` • ${item.sizeName}` : ""}
                               {item.color ? ` • ${item.color}` : ""}
                             </p>
                           </div>
@@ -1798,6 +1910,15 @@ function Sales() {
             <button type="button" onClick={exportSalesExcel} className={goldButtonClass}>Export Excel (CSV)</button>
             <button
               type="button"
+              onClick={printAllSalesReport}
+              disabled={sortedSales.length === 0}
+              className={`${greenButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              <Icon name="print" className="h-4 w-4" />
+              Print All Sales Report
+            </button>
+            <button
+              type="button"
               onClick={() => refreshData?.()}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFA900]/60 bg-[#FFF8E1] px-4 py-3 text-sm font-bold text-[#7A5A00] transition hover:-translate-y-0.5 hover:bg-[#FFF1C2] hover:shadow-md"
             >
@@ -2036,7 +2157,7 @@ function Sales() {
                                   </td>
 
                                   <td className="p-3 text-[#6B7A6F]">
-                                    {[item.variantName, item.color]
+                                    {[item.variantName, item.sizeName, item.color]
                                       .filter(Boolean)
                                       .join(" / ") || "-"}
                                   </td>
@@ -2097,6 +2218,132 @@ function Sales() {
               })}
             </div>
           )}
+        </section>
+
+        {/* PRINT ALL CUSTOMER SALES REPORT */}
+        <section className="sales-report-print fixed -left-[10000px] top-0 w-[190mm] bg-white p-0 text-black">
+          <div className="mb-5 border-b-2 border-[#003B16] pb-3">
+            <div className="flex items-center gap-4">
+              <img src={logo} alt="SR Furniture Logo" className="h-20 w-20 object-contain" />
+              <div className="flex-1">
+                <h1 className="text-2xl font-extrabold tracking-wide text-[#003B16]">SR FURNITURE</h1>
+                <p className="text-sm font-bold">SRI SAIRAMA AGENCY</p>
+                <p className="text-xs">{SHOP_ADDRESS}</p>
+                <p className="text-xs">Mob: {SHOP_MOBILES.join(", ")}</p>
+              </div>
+              <div className="text-right">
+                <h2 className="text-lg font-extrabold">SALES REPORT</h2>
+                <p className="text-xs">Printed: {new Date().toLocaleDateString("en-IN")}</p>
+                <p className="text-xs">Total Bills: {sortedSales.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+            <div className="border border-gray-400 p-2">
+              <p className="text-xs text-gray-600">Total Bills</p>
+              <p className="font-bold">{sortedSales.length}</p>
+            </div>
+            <div className="border border-gray-400 p-2">
+              <p className="text-xs text-gray-600">Total Sales</p>
+              <p className="font-bold">{money(sortedSales.reduce((sum, bill) => sum + getBillTotal(bill), 0))}</p>
+            </div>
+            <div className="border border-gray-400 p-2">
+              <p className="text-xs text-gray-600">Total Pending</p>
+              <p className="font-bold">{money(sortedSales.reduce((sum, bill) => sum + getBillBalance(bill), 0))}</p>
+            </div>
+          </div>
+
+          {sortedSales.map((bill, billIndex) => {
+            const reportItems = Array.isArray(bill.items) ? bill.items : [];
+            const reportSubtotal = Number(
+              bill.subtotal ??
+                reportItems.reduce(
+                  (sum, item) =>
+                    sum + Number(item.sellingPrice || 0) * Number(item.quantity || 0),
+                  0
+                )
+            );
+            const reportGst =
+              Number(bill.cgstAmount || 0) +
+              Number(bill.sgstAmount || 0) +
+              Number(bill.igstAmount || 0);
+
+            return (
+              <div className="sales-report-bill" key={bill.id || bill._id || bill.billNumber || billIndex}>
+                <div className="sales-report-page-title mb-2 flex flex-wrap items-start justify-between gap-2 border-b border-gray-500 pb-2">
+                  <div>
+                    <h3 className="text-sm font-extrabold">
+                      Bill {bill.billNumber || bill.id || bill._id || `#${billIndex + 1}`}
+                    </h3>
+                    <p className="text-xs">
+                      Customer: <strong>{bill.customerName || "Walk-in Customer"}</strong>
+                      {"  |  "}Mobile: {bill.customerMobile || "-"}
+                    </p>
+                    <p className="text-xs">
+                      Date: {bill.date || bill.createdAt
+                        ? new Date(bill.date || bill.createdAt).toLocaleDateString("en-IN")
+                        : "-"}
+                      {"  |  "}Status: {getBillStatus(bill)}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs">
+                    <p>Items: {reportItems.length} product types</p>
+                    <p>Pieces: {reportItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)}</p>
+                  </div>
+                </div>
+
+                <table>
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="text-left">#</th>
+                      <th className="text-left">Product / Model</th>
+                      <th className="text-left">Size / Type</th>
+                      <th className="text-right">Qty</th>
+                      <th className="text-right">MRP</th>
+                      <th className="text-right">Selling Price</th>
+                      <th className="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportItems.map((item, itemIndex) => (
+                      <tr key={item.id || item._id || itemIndex}>
+                        <td>{itemIndex + 1}</td>
+                        <td>{item.productName || item.name || "Product"}</td>
+                        <td>
+                          {[item.variantName, item.sizeName, item.color]
+                            .filter(Boolean)
+                            .join(" / ") || "-"}
+                        </td>
+                        <td className="text-right">{Number(item.quantity || 0)}</td>
+                        <td className="text-right">{money(item.mrp)}</td>
+                        <td className="text-right">{money(item.sellingPrice)}</td>
+                        <td className="text-right">
+                          {money(item.totalAmount ?? Number(item.sellingPrice || 0) * Number(item.quantity || 0))}
+                        </td>
+                      </tr>
+                    ))}
+                    {reportItems.length === 0 && (
+                      <tr><td colSpan={7} className="text-center">No product details stored for this bill.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+
+                <div className="sales-report-totals mt-2 grid grid-cols-6 gap-2 text-[7px]">
+                  <div><span>Subtotal</span><strong>{money(reportSubtotal)}</strong></div>
+                  <div><span>Discount</span><strong>{money(bill.discount || 0)}</strong></div>
+                  <div><span>GST</span><strong>{money(reportGst)}</strong></div>
+                  <div><strong>Grand Total</strong><strong>{money(getBillTotal(bill))}</strong></div>
+                  <div><span>Paid Amount</span><strong>{money(bill.paidAmount || 0)}</strong></div>
+                  <div className="text-red-700"><strong>Balance Due</strong><strong>{money(getBillBalance(bill))}</strong></div>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="mt-5 border-t-2 border-[#003B16] pt-2 text-center text-xs">
+            SR Furniture • Complete Customer Sales Report
+          </div>
         </section>
 
         {/* PRINT BILLS */}
@@ -2229,12 +2476,16 @@ function BillContactFooter() {
   );
 }
 
+
 function BillHeader({ bill, showGST = true }) {
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-[#003B22]">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-[linear-gradient(135deg,#001F0B_0%,#003B16_100%)] px-5 py-4 text-white">
-        <div className="flex items-center gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl p-2 ring-2 ring-[#FFD75A]/70">
+    <div className="mb-4 overflow-hidden rounded-lg border border-[#003B22]">
+      {/* HEADER */}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-3 bg-[linear-gradient(135deg,#001F0B_0%,#003B16_100%)] px-4 py-3 text-white">
+        
+        {/* COMPANY DETAILS */}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center">
             <img
               src={logo}
               alt="SR Furniture Logo"
@@ -2242,30 +2493,43 @@ function BillHeader({ bill, showGST = true }) {
             />
           </div>
 
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-wide text-[#FFD75A] sm:text-3xl">
+          <div className="min-w-0">
+            <h1 className="text-xl font-extrabold tracking-wide text-[#FFD75A] sm:text-2xl">
               SR FURNITURE
             </h1>
 
-            <p className="mt-1 text-sm text-[#D5E6D9]">
-              Furniture Sales & Billing<br />Shanti Nagar, Kodada Road, Jaggayyapeta - 521175<br />{showGST && <>GSTIN: 37AFKFS7856K1Z2<br /></>}Mob: 7702786502, 9346467670, 9948380869
+            <h6 className="text-sm font-extrabold text-white">
+              SRI SAIRAMA AGENCY
+            </h6>
+
+            <p className="mt-1 text-xs leading-relaxed text-[#D5E6D9]">
+              Furniture Sales & Billing<br />
+              Shanti Nagar, Kodada Road, Jaggayyapeta - 521175<br />
+              {showGST && (
+                <>
+                  GSTIN: 37AFKFS7856K1Z2
+                  <br />
+                </>
+              )}
+              Mob: 7702786502, 9346467670, 9948380869
             </p>
           </div>
         </div>
 
-        <div className="text-left sm:text-right">
-          <h2 className="inline-block rounded-md bg-[#FFD75A] px-3 py-1 text-base font-extrabold tracking-widest text-[#001F0B]">
+        {/* BILL DETAILS */}
+        <div className="shrink-0 text-right">
+          <h2 className="inline-block rounded-md bg-[#FFD75A] px-2 py-1 text-xs font-extrabold tracking-wide text-[#001F0B] sm:text-sm">
             {showGST ? "GST TAX INVOICE" : "CUSTOMER BILL"}
           </h2>
 
-          <p className="mt-2 text-sm">
+          <p className="mt-2 text-xs">
             Bill No:{" "}
             <strong className="text-[#FFD75A]">
               {bill.billNumber || bill.id || "N/A"}
             </strong>
           </p>
 
-          <p className="text-sm">
+          <p className="text-xs">
             Date:{" "}
             <strong>
               {bill.date
@@ -2276,20 +2540,34 @@ function BillHeader({ bill, showGST = true }) {
         </div>
       </div>
 
+      {/* GOLD LINE */}
       <div className="h-1 bg-gradient-to-r from-[#9B7136] via-[#FFD75A] to-[#9B7136]" />
 
-      <div className="grid grid-cols-1 gap-2 bg-[#FFFBEA] px-5 py-3 text-sm sm:grid-cols-2">
+      {/* CUSTOMER DETAILS */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-[#FFFBEA] px-4 py-3 text-xs">
         <p>
           <strong className="text-[#003B22]">Customer:</strong>{" "}
           {bill.customerName || "Walk-in Customer"}
         </p>
 
-        <p><strong className="text-[#003B22]">Mobile:</strong> {bill.customerMobile || "-"}</p>
-        {showGST && <p><strong className="text-[#003B22]">Place of Supply:</strong> {bill.placeOfSupply || "Andhra Pradesh"}</p>}
+        <p>
+          <strong className="text-[#003B22]">Mobile:</strong>{" "}
+          {bill.customerMobile || "-"}
+        </p>
+
+        {showGST && (
+          <p className="col-span-2">
+            <strong className="text-[#003B22]">
+              Place of Supply:
+            </strong>{" "}
+            {bill.placeOfSupply || "Andhra Pradesh"}
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
 
 function BillTable({ bill, showGST = true }) {
   const items = bill.items || [];
@@ -2378,7 +2656,7 @@ function BillTable({ bill, showGST = true }) {
                   </td>
 
                   <td className="p-2.5">
-                    {[item.variantName, item.color]
+                    {[item.variantName, item.sizeName, item.color]
                       .filter(Boolean)
                       .join(" / ") || "-"}
                   </td>
