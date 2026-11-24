@@ -1360,23 +1360,10 @@ function Products() {
 
           {/* VARIANTS SECTION */}
           <div className="border-t border-[#EFE8CF] pt-8">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-5">
               <SectionTitle hint="Add different sizes or types with separate prices and stock.">
                 Product Size / Type
               </SectionTitle>
-
-              <button
-                type="button"
-                onClick={addSizeRow}
-                className={buttonClass}
-              >
-                <Icon
-                  name="plus"
-                  className="h-4 w-4"
-                  strokeWidth={3}
-                />
-                Add Size / Type
-              </button>
             </div>
 
             <div className="space-y-5">
@@ -1487,6 +1474,22 @@ function Products() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* ADD SIZE / TYPE BUTTON - BELOW ALL SIZE CARDS */}
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={addSizeRow}
+                className={buttonClass}
+              >
+                <Icon
+                  name="plus"
+                  className="h-4 w-4"
+                  strokeWidth={3}
+                />
+                Add Size / Type
+              </button>
             </div>
           </div>
 

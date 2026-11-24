@@ -44,18 +44,18 @@ const getBillDateKey = (bill) => {
 /* ------------------------------------------------------------------ */
 
 const inputClass =
-  "w-full min-h-[52px] rounded-xl border border-[#E6DEC3] bg-white px-4 py-3 text-base font-medium text-[#001F0B] shadow-[inset_0_1px_2px_rgba(0,31,11,0.04)] outline-none transition duration-200 placeholder:text-[#9AA59C] hover:border-[#DFA900]/60 focus:border-[#DFA900] focus:ring-4 focus:ring-[#DFA900]/20 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full min-h-[52px] rounded-xl border border-[#E6DEC3] bg-white px-4 py-3 text-base font-medium text-[#001F0B] shadow-[inset_0_1px_2px_rgba(0,31,11,0.04)] outline-none transition duration-200 placeholder:text-[#9AA59C] hover:border-[#DFA900]/60 hover:bg-[#FFFEF9] focus:border-[#DFA900] focus:bg-white focus:ring-4 focus:ring-[#DFA900]/20 focus:shadow-[0_10px_24px_-10px_rgba(223,169,0,0.55)] disabled:cursor-not-allowed disabled:border-[#EFE8CF] disabled:bg-[#F6F3E7] disabled:opacity-60 motion-reduce:transition-none";
 
-const labelClass = "mb-2 block text-sm font-semibold text-[#003B16]";
+const labelClass = "mb-2 block text-sm font-semibold tracking-wide text-[#003B16]";
 
 const cardClass =
-  "rounded-3xl border border-[#E6DEC3] bg-white shadow-[0_14px_34px_-20px_rgba(0,31,11,0.28)]";
+  "rounded-3xl border border-[#E6DEC3] bg-white shadow-[0_14px_34px_-20px_rgba(0,31,11,0.28)] transition-shadow duration-300 hover:shadow-[0_20px_44px_-22px_rgba(0,31,11,0.38)]";
 
 const greenButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#0A4F24] to-[#003B16] px-5 py-3 text-sm font-bold text-[#FFD75A] shadow-md shadow-[#003B16]/25 ring-1 ring-[#DFA900]/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 active:translate-y-0";
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#0A4F24] to-[#003B16] px-5 py-3 text-sm font-bold text-[#FFD75A] shadow-md shadow-[#003B16]/25 ring-1 ring-[#DFA900]/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 active:translate-y-0 active:scale-[0.98] sales-shine hover:brightness-110 min-h-[44px] select-none touch-manipulation disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none";
 
 const goldButtonClass =
-  "group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-b from-[#FFD75A] to-[#DFA900] px-5 py-3 text-sm font-extrabold text-[#001F0B] shadow-lg shadow-[#DFA900]/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/40 active:translate-y-0";
+  "group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-b from-[#FFD75A] to-[#DFA900] px-5 py-3 text-sm font-extrabold text-[#001F0B] shadow-lg shadow-[#DFA900]/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/40 active:translate-y-0 active:scale-[0.98] sales-shine hover:brightness-105 min-h-[44px] select-none touch-manipulation disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none";
 
 const getBillTotal = (bill) =>
   Number(bill.grandTotal ?? bill.totalAmount ?? bill.subtotal ?? 0);
@@ -241,7 +241,7 @@ function SearchSelect({
             aria-label="Clear"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onChange("")}
-            className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[#FFF1C2] text-[#7A5A00] transition hover:bg-[#FFE48A]"
+            className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[#FFF1C2] text-[#7A5A00] transition hover:bg-[#FFE48A] active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30"
           >
             <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
           </button>
@@ -249,10 +249,10 @@ function SearchSelect({
       </div>
 
       {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[#E6DEC3] bg-[#FFFDF5] shadow-[0_24px_60px_-12px_rgba(0,31,11,0.45)] ring-1 ring-[#DFA900]/20">
+        <div className="sales-pop absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[#E6DEC3] bg-[#FFFDF5] shadow-[0_24px_60px_-12px_rgba(0,31,11,0.45)] ring-1 ring-[#DFA900]/20">
           <div className="h-1 bg-gradient-to-r from-[#DFA900] via-[#FFD75A] to-[#DFA900]" />
 
-          <div className="max-h-64 overflow-y-auto p-1.5">
+          <div className="max-h-64 overflow-y-auto overscroll-contain p-1.5">
             {filteredOptions.length ? (
               filteredOptions.map((option) => {
                 const isSelected =
@@ -269,10 +269,10 @@ function SearchSelect({
                       onSelect(option);
                       setOpen(false);
                     }}
-                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left text-base transition-colors ${
+                    className={`group flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left text-base transition duration-150 active:scale-[0.99] ${
                       isSelected
                         ? "bg-[#003B16] font-bold text-[#FFD75A]"
-                        : "font-medium text-[#1F3A2A] hover:bg-[#FFF1C2]"
+                        : "font-medium text-[#1F3A2A] hover:translate-x-1 hover:bg-[#FFF1C2]"
                     }`}
                   >
                     <span className="min-w-0 break-words">{option.label}</span>
@@ -284,7 +284,7 @@ function SearchSelect({
                         strokeWidth={3}
                       />
                     ) : (
-                      <span className="shrink-0 text-xs font-semibold text-[#B58A00]">
+                      <span className="shrink-0 text-xs font-semibold text-[#B58A00] opacity-60 transition-opacity group-hover:opacity-100">
                         Select
                       </span>
                     )}
@@ -320,6 +320,7 @@ function Sales() {
   const [companySearch, setCompanySearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [modelSearch, setModelSearch] = useState("");
+  const [directProductSearch, setDirectProductSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedSize, setSelectedSize] = useState(null);
 
@@ -463,6 +464,44 @@ function Sales() {
       })),
     [modelProducts]
   );
+
+  // One global search across Category, Company, Model and Size / Type.
+  // Results stay one product per row and preserve the existing cascade selectors.
+  const directProductResults = useMemo(() => {
+    const term = directProductSearch.trim().toLowerCase();
+    if (!term) return [];
+
+    return products
+      .map((product) => {
+        const category = product.category;
+        const categoryName = String(
+          product.categoryName ||
+            (typeof category === "string" ? category : category?.name || category?.label) ||
+            ""
+        );
+        const companyName = getProductCompany(product);
+        const modelName = getProductModel(product);
+        const stockRows = Array.isArray(product.sizes) && product.sizes.length
+          ? product.sizes.map((size) => ({ ...size, _legacyVariant: false }))
+          : (product.variants || []).flatMap((variant) =>
+              Array.isArray(variant.sizes) && variant.sizes.length
+                ? variant.sizes.map((size) => ({ ...size, _legacyVariant: true, id: size.id ?? variant.id }))
+                : [{ ...variant, id: variant.id, name: variant.name || variant.variantName || variant.size, _legacyVariant: true }]
+            );
+        const matchingSizes = stockRows.filter((size) =>
+          Number(size.quantity || 0) > 0 &&
+          String(getSizeLabel(size)).toLowerCase().includes(term)
+        );
+        const matchesProduct = [categoryName, companyName, modelName, product.name]
+          .some((value) => String(value || "").toLowerCase().includes(term));
+
+        if (!matchesProduct && matchingSizes.length === 0) return null;
+        if (getProductAvailableStock(product) <= 0) return null;
+
+        return { product, categoryName, companyName, modelName, matchingSizes };
+      })
+      .filter(Boolean);
+  }, [products, directProductSearch]);
 
   // Step 4: direct Size / Type rows under the selected Model.
   // Older products stored stock in variants; expose those as flat legacy Size / Type choices.
@@ -613,7 +652,24 @@ function Sales() {
     setMessage("");
   };
 
-  const addToCart = (product, size = null) => {
+  const handleDirectProductSelect = (result) => {
+    const { product, categoryName, companyName, modelName } = result;
+    const categoryOption = categoryOptions.find(
+      (option) => option.label.toLowerCase() === String(categoryName).toLowerCase()
+    ) || { value: String(product.categoryId ?? categoryName), label: categoryName };
+    const companyOption = { value: companyName, label: companyName };
+
+    setSelectedCategory(categoryOption);
+    setCategorySearch(categoryName);
+    setSelectedCompany(companyOption);
+    setCompanySearch(companyName);
+    setSelectedProduct(product);
+    setModelSearch(modelName);
+    setSelectedSize(null);
+    setMessage("");
+  };
+
+  const addToCart = (product, size = null, directCategory = "", directCompany = "") => {
     const legacyVariant = Boolean(size?._legacyVariant);
     const variantId = legacyVariant ? (size?.id ?? null) : null;
     const sizeId = legacyVariant ? null : (size?.id ?? null);
@@ -671,8 +727,8 @@ function Sales() {
           variantId,
           sizeId,
           productName: product.name,
-          category: selectedCategory?.label || "",
-          company: selectedCompany?.label || getProductCompany(product),
+          category: directCategory || selectedCategory?.label || String(product.categoryName || (typeof product.category === "string" ? product.category : product.category?.name || product.category?.label) || ""),
+          company: directCompany || selectedCompany?.label || getProductCompany(product),
           modelName: getProductModel(product),
           variantName: variantLabel,
           sizeName: sizeLabel,
@@ -991,10 +1047,192 @@ function Sales() {
 
   return (
     <div
-      className="sales-root relative bg-[#FFFDF5] p-3 sm:p-5 lg:p-7"
+      className="sales-root relative bg-[#FFFDF5] p-3 antialiased sm:p-5 lg:p-7"
       style={{ zoom: 0.8, minHeight: "125vh" }}
     >
       <style>{`
+        /* ---------- Screen-only polish (never affects print) ---------- */
+        .sales-root {
+          scroll-behavior: smooth;
+          -webkit-tap-highlight-color: transparent;
+          text-rendering: optimizeLegibility;
+        }
+
+        .sales-root * {
+          scrollbar-width: thin;
+          scrollbar-color: #DFA900 transparent;
+        }
+
+        .sales-root ::selection {
+          background: rgba(255, 215, 90, 0.55);
+          color: #001F0B;
+        }
+
+        .sales-root button,
+        .sales-root select,
+        .sales-root input[type="date"] {
+          touch-action: manipulation;
+        }
+
+        .sales-root button:not(:disabled),
+        .sales-root select {
+          cursor: pointer;
+        }
+
+        /* Clean number fields - no tiny spinner arrows */
+        .sales-root input[type="number"] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
+        .sales-root input[type="number"]::-webkit-inner-spin-button,
+        .sales-root input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        /* Keyboard focus ring for anything that has no ring of its own (zero specificity) */
+        :where(.sales-root button:focus-visible, .sales-root select:focus-visible) {
+          outline: 2px solid rgba(223, 169, 0, 0.9);
+          outline-offset: 2px;
+        }
+
+        /* Entrance animations */
+        @keyframes salesFadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes salesSlideDown {
+          from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes salesPop {
+          from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes salesExpand {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: none; }
+        }
+
+        .sales-enter  { animation: salesFadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        .sales-alert  { animation: salesSlideDown 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        .sales-pop    { transform-origin: top; animation: salesPop 0.18s ease-out backwards; }
+        .sales-expand { animation: salesExpand 0.25s ease-out backwards; }
+
+        .sales-stagger > * { animation: salesFadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+        .sales-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+        .sales-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+        .sales-stagger > *:nth-child(4) { animation-delay: 0.15s; }
+        .sales-stagger > *:nth-child(5) { animation-delay: 0.20s; }
+        .sales-stagger > *:nth-child(6) { animation-delay: 0.25s; }
+        .sales-stagger > *:nth-child(n+7) { animation-delay: 0.30s; }
+
+        /* Touch screens: no "stuck" hover lift after a tap */
+        @media (hover: none) {
+          .sales-root [class*="hover:-translate-y"]:hover {
+            transform: none !important;
+          }
+        }
+
+        /* Respect "reduce motion" system setting */
+        @media (prefers-reduced-motion: reduce) {
+          .sales-root *:not(.animate-spin),
+          .sales-root *:not(.animate-spin)::before,
+          .sales-root *:not(.animate-spin)::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+
+        /* ---------- Extra dynamic effects ---------- */
+        @keyframes salesFloat { 0%,100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+        @keyframes salesFloatSlow { 0%,100% { translate: 0 0; } 50% { translate: 14px 18px; } }
+        @keyframes salesSpinSlow { to { transform: rotate(360deg); } }
+        @keyframes salesGoldFlow { from { background-position-x: 0%; } to { background-position-x: 200%; } }
+        @keyframes salesBreath { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes salesShineSweep { 0% { left: -70%; } 55%,100% { left: 140%; } }
+        @keyframes salesGlow {
+          from { box-shadow: 0 10px 24px -8px rgba(223,169,0,0.45); }
+          to   { box-shadow: 0 14px 40px -2px rgba(223,169,0,0.95), 0 0 0 4px rgba(255,215,90,0.25); }
+        }
+        @keyframes salesTextGlow {
+          from { text-shadow: 0 0 0 rgba(255,215,90,0); }
+          to   { text-shadow: 0 0 18px rgba(255,215,90,0.7); }
+        }
+        @keyframes salesRingRed {
+          0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.5); }
+          100% { box-shadow: 0 0 0 8px rgba(220,38,38,0); }
+        }
+        @keyframes salesRingAmber {
+          0% { box-shadow: 0 0 0 0 rgba(217,119,6,0.55); }
+          100% { box-shadow: 0 0 0 8px rgba(217,119,6,0); }
+        }
+        @keyframes salesCartIn {
+          0%   { opacity: 0; transform: translateX(48px) scale(0.95); }
+          65%  { opacity: 1; transform: translateX(-5px) scale(1.012); }
+          100% { opacity: 1; transform: none; }
+        }
+        @keyframes salesTitleShine {
+          from { background-position: 150% 0; }
+          to   { background-position: -50% 0; }
+        }
+
+        .sales-float { animation: salesFloat 3.4s ease-in-out infinite; }
+        .sales-float-slow { animation: salesFloatSlow 9s ease-in-out infinite; }
+        .sales-float-slow-rev { animation: salesFloatSlow 11s ease-in-out infinite reverse; }
+        .sales-spin-slow { animation: salesSpinSlow 16s linear infinite; }
+        .sales-breath { animation: salesBreath 6s ease-in-out infinite; }
+        .sales-gold-flow {
+          background-size: 200% 100%;
+          background-repeat: repeat-x;
+          animation: salesGoldFlow 4s linear infinite;
+        }
+        .sales-glow { animation: salesGlow 1.8s ease-in-out infinite alternate; }
+        .sales-glow:disabled { animation: none; }
+        .sales-text-glow { animation: salesTextGlow 2.2s ease-in-out infinite alternate; }
+        .sales-ring-red { animation: salesRingRed 1.8s ease-out infinite; }
+        .sales-ring-amber { animation: salesRingAmber 1.8s ease-out infinite; }
+        .sales-stagger > .sales-cart-in { animation: salesCartIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+        .sales-title-shine {
+          color: transparent !important;
+          background-image: linear-gradient(100deg, #ffffff 0%, #ffffff 38%, #FFD75A 50%, #ffffff 62%, #ffffff 100%);
+          background-size: 250% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          animation: salesTitleShine 5s linear infinite;
+        }
+
+        /* Shine sweep across buttons */
+        .sales-shine { position: relative; overflow: hidden; }
+        .sales-shine::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: -70%;
+          width: 45%;
+          background: linear-gradient(100deg, transparent, rgba(255,255,255,0.45), transparent);
+          transform: skewX(-20deg);
+          pointer-events: none;
+          animation: salesShineSweep 3.8s ease-in-out infinite;
+        }
+        .sales-shine:disabled::after { display: none; }
+
+        @media print {
+          .sales-title-shine { color: inherit !important; background: none !important; }
+          .sales-shine::after { display: none; }
+        }
+
+        @media print {
+          .sales-enter, .sales-alert, .sales-pop, .sales-expand,
+          .sales-stagger > * {
+            animation: none !important;
+          }
+        }
+
         @media print {
           @page {
             size: A4;
@@ -1243,17 +1481,17 @@ function Sales() {
         }
       `}</style>
 
-      <div className="no-print pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(223,169,0,0.10),transparent_65%)]" />
+      <div className="no-print sales-breath pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(223,169,0,0.10),transparent_65%)]" />
 
       <div className="relative space-y-6">
         {/* HEADER */}
-        <header className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#001F0B_0%,#003B16_60%,#0A4F24_100%)] shadow-[0_22px_44px_-20px_rgba(0,31,11,0.7)] ring-1 ring-[#DFA900]/30">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
-          <div className="pointer-events-none absolute -bottom-28 right-44 h-60 w-60 rounded-full border-[24px] border-[#FFD75A]/10" />
+        <header className="sales-enter relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#001F0B_0%,#003B16_60%,#0A4F24_100%)] shadow-[0_22px_44px_-20px_rgba(0,31,11,0.7)] ring-1 ring-[#DFA900]/30">
+          <div className="sales-float-slow pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
+          <div className="sales-float-slow-rev pointer-events-none absolute -bottom-28 right-44 h-60 w-60 rounded-full border-[24px] border-[#FFD75A]/10" />
 
           <div className="relative flex flex-col justify-between gap-6 p-5 sm:flex-row sm:items-center sm:p-8">
             <div className="flex items-center gap-4 sm:gap-5">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-[#DFA900]/40 bg-white/5 p-1.5 shadow-lg backdrop-blur-sm sm:h-24 sm:w-24">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-[#DFA900]/40 bg-white/5 p-1.5 shadow-lg backdrop-blur-sm transition duration-300 hover:scale-105 hover:border-[#DFA900]/70 sm:h-24 sm:w-24">
                 <img
                   src={logo}
                   alt="SR Furniture Logo"
@@ -1266,7 +1504,7 @@ function Sales() {
                   SR Furniture
                 </p>
 
-                <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                <h1 className="sales-title-shine mt-1.5 text-[clamp(1.75rem,1.2rem+2vw,2.5rem)] font-extrabold leading-tight tracking-tight text-white">
                   Sales & Billing
                 </h1>
 
@@ -1276,14 +1514,14 @@ function Sales() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 self-start rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-sm sm:self-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFD75A]/15 text-[#FFD75A]">
-                <Icon name="sun" />
+            <div className="flex items-center gap-3 self-start rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-sm transition duration-300 hover:bg-white/15 sm:self-center">
+              <div className="sales-float flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFD75A]/15 text-[#FFD75A]">
+                <Icon name="sun" className="h-5 w-5 sales-spin-slow" />
               </div>
 
               <div>
                 <p className="text-xs font-semibold text-white/70">Today</p>
-                <p className="text-xl font-extrabold tabular-nums text-[#FFD75A]">
+                <p className="sales-text-glow text-xl font-extrabold tabular-nums text-[#FFD75A]">
                   {statsLoading ? "..." : money(todayStats.amount)}
                 </p>
                 <p className="text-xs text-white/60">
@@ -1294,15 +1532,15 @@ function Sales() {
             </div>
           </div>
 
-          <div className="h-1.5 bg-gradient-to-r from-[#9B7136] via-[#FFD75A] to-[#9B7136]" />
+          <div className="sales-gold-flow h-1.5 bg-gradient-to-r from-[#9B7136] via-[#FFD75A] to-[#9B7136]" />
         </header>
 
         {/* STATS */}
-        <div className="no-print grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="no-print sales-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map((card) => (
             <div
               key={card.title}
-              className={`group relative overflow-hidden rounded-2xl p-5 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${toneStyles[card.tone]}`}
+              className={`group relative cursor-default overflow-hidden rounded-2xl p-5 transition duration-300 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-2xl ${toneStyles[card.tone]}`}
             >
               <div className="relative z-10 flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1314,7 +1552,7 @@ function Sales() {
                     <div className="mt-3 h-9 w-28 animate-pulse rounded-lg bg-current opacity-10" />
                   ) : (
                     <h2
-                      className={`mt-2 break-words text-3xl font-extrabold tabular-nums ${
+                      className={`mt-2 break-words text-[clamp(1.5rem,1.1rem+0.9vw,1.875rem)] font-extrabold leading-tight tabular-nums ${
                         card.tone === "green" ? "text-[#FFD75A]" : ""
                       }`}
                     >
@@ -1328,7 +1566,7 @@ function Sales() {
                 </div>
 
                 <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition duration-300 group-hover:rotate-[-8deg] group-hover:scale-110 ${toneIcon[card.tone]}`}
+                  className={`sales-float flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition duration-300 group-hover:rotate-[-8deg] group-hover:scale-110 ${toneIcon[card.tone]}`}
                 >
                   <Icon name={card.icon} />
                 </div>
@@ -1344,7 +1582,7 @@ function Sales() {
         {message && (
           <div
             role="status"
-            className={`no-print flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm font-semibold shadow-sm sm:text-base ${
+            className={`no-print sales-alert flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm font-semibold shadow-md sm:text-base ${
               isSuccessMessage
                 ? "border-green-200 bg-green-50 text-green-800"
                 : "border-red-200 bg-red-50 text-red-700"
@@ -1370,7 +1608,7 @@ function Sales() {
               type="button"
               onClick={() => setMessage("")}
               aria-label="Dismiss message"
-              className="rounded-lg p-1 opacity-60 transition hover:opacity-100"
+              className="rounded-lg p-1.5 opacity-60 transition hover:bg-black/5 hover:opacity-100 focus-visible:opacity-100 active:scale-90"
             >
               <Icon name="close" className="h-4 w-4" />
             </button>
@@ -1381,7 +1619,7 @@ function Sales() {
         {stockWarning && (
           <div
             role="alert"
-            className="no-print flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5 text-sm font-semibold text-amber-800 shadow-sm sm:text-base"
+            className="no-print sales-alert flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5 text-sm font-semibold text-amber-800 shadow-md sm:text-base"
           >
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
               <Icon name="alert" className="h-3.5 w-3.5" strokeWidth={3} />
@@ -1393,7 +1631,7 @@ function Sales() {
               type="button"
               onClick={() => setStockWarning("")}
               aria-label="Dismiss warning"
-              className="rounded-lg p-1 opacity-60 transition hover:opacity-100"
+              className="rounded-lg p-1.5 opacity-60 transition hover:bg-black/5 hover:opacity-100 focus-visible:opacity-100 active:scale-90"
             >
               <Icon name="close" className="h-4 w-4" />
             </button>
@@ -1403,7 +1641,7 @@ function Sales() {
         {/* MAIN POS AREA */}
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           {/* PRODUCT SELECTION */}
-          <section className={`no-print relative z-20 p-4 sm:p-6 ${cardClass}`}>
+          <section className={`no-print sales-enter relative z-20 p-4 sm:p-6 ${cardClass}`}>
             <div className="mb-6 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-extrabold text-[#003B16]">
@@ -1415,7 +1653,7 @@ function Sales() {
                 </p>
               </div>
 
-              <span className="rounded-full border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2 text-xs font-extrabold text-[#7A5A00]">
+              <span className="whitespace-nowrap rounded-full border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2 text-xs font-extrabold tabular-nums text-[#7A5A00] shadow-sm">
                 {cart.length} in cart
               </span>
             </div>
@@ -1460,7 +1698,66 @@ function Sales() {
                 }
               />
 
+              <div className="relative sm:col-span-2 xl:col-span-3">
+                <label className={labelClass}>Quick Search (Category / Company / Model / Size)</label>
+                <div className="relative">
+                  <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8A968D]" />
+                  <input
+                    type="search"
+                    value={directProductSearch}
+                    onChange={(event) => setDirectProductSearch(event.target.value)}
+                    placeholder="Search any category, company, model or size / type..."
+                    className={`${inputClass} pl-12 pr-20`}
+                  />
+                  {directProductSearch && (
+                    <button type="button" onClick={() => setDirectProductSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-[#FFF1C2] px-3 py-1.5 text-xs font-bold text-[#7A5A00] transition hover:bg-[#FFE48A] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30">Clear</button>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {directProductSearch.trim() && (
+              <div className="sales-stagger mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold text-[#003B16]">Quick Search Results</h3>
+                  <span className="text-xs font-semibold text-[#6B7A6F]">{directProductResults.length} products</span>
+                </div>
+                {directProductResults.length ? directProductResults.map((result) => {
+                  const { product, categoryName, companyName, modelName, matchingSizes } = result;
+                  const rawImage = product.imageUrl || product.image || product.productImage || product.thumbnail || (Array.isArray(product.images) ? product.images[0] : "");
+                  const imageUrl = typeof rawImage === "string" ? rawImage : rawImage?.url || rawImage?.src || "";
+                  const productPurchasePrice = Number(product.purchasePrice ?? product.buyingPrice ?? product.costPrice ?? 0);
+                  const productMrp = Number(product.mrp || 0);
+                  const productSellingPrice = Number(product.sellingPrice || 0);
+                  return (
+                    <div key={product.id || product._id} className="group grid w-full grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-2xl border border-[#E6DEC3] bg-gradient-to-r from-white to-[#FFFCF1] p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-[#DFA900] hover:shadow-lg hover:ring-2 hover:ring-[#DFA900]/25 focus-within:border-[#DFA900] sm:grid-cols-[76px_minmax(0,1.2fr)_repeat(3,minmax(76px,0.75fr))] sm:items-center sm:gap-4 sm:p-4">
+                      <div className="h-16 w-16 overflow-hidden rounded-xl border border-[#EFE8CF] bg-[#FFF8E1] shadow-inner sm:h-[76px] sm:w-[76px]">
+                        {imageUrl ? <img src={imageUrl} alt={modelName} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black tracking-wider text-[#9A7A20]">SR</div>}
+                      </div>
+                      <button type="button" onClick={() => handleDirectProductSelect(result)} className="min-w-0 self-center rounded-lg text-left transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 group-hover:text-[#0A4F24]">
+                        <p className="truncate text-sm font-extrabold text-[#003B16] sm:text-base">{modelName}</p>
+                        <p className="mt-1 truncate text-xs text-[#6B7A6F]">{categoryName} <span className="px-1">→</span> {companyName}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-[#8A6A13]">{getProductAvailableStock(product)} units available · Select model</p>
+                      </button>
+                      <div className="col-span-2 grid grid-cols-3 gap-2 sm:col-span-1 sm:block">
+                        <div className="rounded-lg bg-[#F1F7EF] px-2 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wide text-[#718071]">Purchase</p><p className="mt-0.5 text-xs font-extrabold text-[#15552B]">{money(productPurchasePrice)}</p></div>
+                        <div className="rounded-lg bg-blue-50 px-2 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wide text-[#718071]">MRP</p><p className="mt-0.5 text-xs font-extrabold text-blue-700">{money(productMrp)}</p></div>
+                        <div className="rounded-lg bg-emerald-50 px-2 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wide text-[#718071]">Selling</p><p className="mt-0.5 text-xs font-extrabold text-emerald-700">{money(productSellingPrice)}</p></div>
+                      </div>
+                      {matchingSizes.length > 0 && (
+                        <div className="col-span-2 flex w-full flex-wrap gap-2 border-t border-[#EFE8CF] pt-2 sm:col-span-4 sm:justify-end">
+                          {matchingSizes.map((size, index) => (
+                            <button key={`${product.id || product._id}-${size.id || index}`} type="button" onClick={() => { handleDirectProductSelect(result); addToCart(product, size, categoryName, companyName); }} className="flex min-w-[118px] flex-1 items-center justify-between gap-2 rounded-xl border border-[#DFA900]/50 bg-[#FFF8E1] px-3 py-2 text-left text-xs font-bold text-[#6B4F00] transition hover:border-[#B58A00] hover:bg-[#FFF1C2] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 sm:flex-none">
+                              <span className="truncate">{getSizeLabel(size)}</span><span className="shrink-0 rounded-md bg-white/80 px-1.5 py-0.5">{Number(size.quantity || 0)} left</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }) : <p className="rounded-xl border border-dashed border-[#E6DEC3] p-4 text-center text-sm text-[#6B7A6F]">No matching in-stock products found.</p>}
+              </div>
+            )}
 
             {selectedCategory && companyOptions.length === 0 && (
               <p className="mt-4 text-sm font-medium text-[#B42318]">
@@ -1473,16 +1770,25 @@ function Sales() {
               <div className="mt-6 border-t border-[#EFE8CF] pt-5">
                 <h3 className="mb-3 text-lg font-extrabold text-[#003B16]">{getProductModel(selectedProduct)} - Select Size / Type</h3>
                 <p className="mb-3 text-xs text-[#6B7A6F]">Only in-stock Size / Type options are shown.</p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sales-stagger grid grid-cols-1 gap-3">
                   {sizes.map((size, index) => {
                     const quantity = Number(size.quantity || 0);
                     const lowStock = isLowStock(quantity);
+                    const purchasePrice = Number(size.purchasePrice ?? size.buyingPrice ?? size.costPrice ?? selectedProduct.purchasePrice ?? selectedProduct.buyingPrice ?? selectedProduct.costPrice ?? 0);
+                    const mrp = Number(size.mrp ?? selectedProduct.mrp ?? 0);
+                    const sellingPrice = Number(size.sellingPrice ?? selectedProduct.sellingPrice ?? 0);
                     return (
-                      <button type="button" key={size.id ?? `${getSizeLabel(size)}-${index}`} onClick={() => handleSizeSelect(size)} className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg ${lowStock ? "border-amber-300 bg-amber-50/60" : "border-[#E6DEC3] bg-white hover:border-[#DFA900]/70"}`}>
-                        <div className="flex items-center justify-between gap-2"><h4 className="font-extrabold text-[#003B16]">{getSizeLabel(size) || "Size / Type"}</h4><span className="rounded-full bg-[#E4F1E6] px-2.5 py-1 text-xs font-bold text-[#0E5A2A]">{lowStock ? `Only ${quantity} left` : `Stock: ${quantity}`}</span></div>
-                        {size.warranty ? <p className="mt-1 text-xs text-[#6B7A6F]">Warranty: {size.warranty}</p> : null}
-                        <div className="mt-3 flex flex-wrap gap-2 text-sm"><span className="rounded-lg bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">MRP: {money(size.mrp ?? selectedProduct.mrp)}</span><span className="rounded-lg bg-green-50 px-2.5 py-1 font-semibold text-green-700">Selling: {money(size.sellingPrice ?? selectedProduct.sellingPrice)}</span></div>
-                        <p className="mt-3 text-sm font-bold text-[#B58A00]">Add to Cart</p>
+                      <button type="button" key={size.id ?? `${getSizeLabel(size)}-${index}`} onClick={() => handleSizeSelect(size)} className={`group w-full rounded-2xl border p-3 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-2 hover:ring-[#DFA900]/30 active:translate-y-0 active:scale-[0.995] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 sm:p-4 ${lowStock ? "border-amber-300 bg-gradient-to-r from-amber-50 to-white" : "border-[#E6DEC3] bg-gradient-to-r from-white via-[#FFFEFA] to-[#FFF8E5] hover:border-[#DFA900]"}`}>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1.25fr)_repeat(3,minmax(0,1fr))_auto] sm:items-center sm:gap-3">
+                          <div className="col-span-2 min-w-0 sm:col-span-1">
+                            <div className="flex flex-wrap items-center gap-2"><h4 className="truncate text-sm font-extrabold text-[#003B16] sm:text-base">{getSizeLabel(size) || "Size / Type"}</h4><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${lowStock ? "sales-ring-amber bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-200" : "bg-[#E4F1E6] text-[#0E5A2A]"}`}>{lowStock ? `Only ${quantity} left` : `Stock: ${quantity}`}</span></div>
+                            {size.warranty ? <p className="mt-1 text-[11px] text-[#6B7A6F]">Warranty: {size.warranty}</p> : <p className="mt-1 text-[11px] text-[#8A968D]">Available size / type</p>}
+                          </div>
+                          <div className="rounded-lg bg-[#F1F7EF] px-2.5 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718071]">Purchase Price</p><p className="mt-0.5 text-xs font-extrabold text-[#15552B] sm:text-sm">{money(purchasePrice)}</p></div>
+                          <div className="rounded-lg bg-blue-50 px-2.5 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718071]">MRP</p><p className="mt-0.5 text-xs font-extrabold text-blue-700 sm:text-sm">{money(mrp)}</p></div>
+                          <div className="rounded-lg bg-emerald-50 px-2.5 py-2 sm:bg-transparent sm:px-0"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718071]">Selling Price</p><p className="mt-0.5 text-xs font-extrabold text-emerald-700 sm:text-sm">{money(sellingPrice)}</p></div>
+                          <span className="col-span-2 inline-flex items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-[#06451D] to-[#0B642C] px-3 py-2 text-xs font-extrabold text-[#FFD75A] shadow-sm transition group-hover:from-[#0B642C] group-hover:to-[#0A4F24] group-hover:shadow-md group-active:scale-95 sm:col-span-1 sm:whitespace-nowrap"><Icon name="plus" className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-180" /> Add</span>
+                        </div>
                       </button>
                     );
                   })}
@@ -1496,10 +1802,10 @@ function Sales() {
 
           {/* BILLING */}
           <section
-            className={`no-print relative z-10 p-4 sm:p-6 xl:sticky xl:top-4 xl:max-h-[calc((100vh-2rem)/0.8)] xl:overflow-y-auto ${cardClass}`}
+            className={`no-print sales-enter relative z-10 p-4 sm:p-6 xl:sticky xl:top-4 xl:max-h-[calc((100vh-2rem)/0.8)] xl:overflow-y-auto xl:overscroll-contain ${cardClass}`}
           >
             <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40">
+              <div className="sales-float flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40">
                 <Icon name="cart" className="h-6 w-6" />
               </div>
 
@@ -1588,7 +1894,7 @@ function Sales() {
               </div>
 
               {cart.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-8 text-center">
+                <div className="sales-enter rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-8 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow ring-1 ring-[#DFA900]/40">
                     <Icon name="cart" />
                   </div>
@@ -1602,7 +1908,7 @@ function Sales() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="sales-stagger space-y-4">
                   {cart.map((item) => {
                     const itemTotal =
                       Number(item.sellingPrice || 0) * item.quantity;
@@ -1614,7 +1920,7 @@ function Sales() {
                     return (
                       <div
                         key={item.key}
-                        className="rounded-2xl border border-[#E6DEC3] bg-gradient-to-br from-[#FFFDF5] to-white p-4 shadow-sm transition hover:border-[#DFA900]/60 hover:shadow-md"
+                        className="sales-cart-in rounded-2xl border border-[#E6DEC3] bg-gradient-to-br from-[#FFFDF5] to-white p-4 shadow-sm transition duration-200 hover:scale-[1.01] hover:border-[#DFA900]/60 hover:shadow-lg focus-within:border-[#DFA900]/70 focus-within:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -1634,7 +1940,7 @@ function Sales() {
                           <button
                             type="button"
                             onClick={() => removeFromCart(item.key)}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-100 bg-white px-2.5 py-1.5 text-xs font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-100 bg-white px-2.5 py-2 text-xs font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20"
                           >
                             <Icon name="trash" className="h-3.5 w-3.5" />
                             Remove
@@ -1681,7 +1987,7 @@ function Sales() {
                               Quantity
                             </label>
 
-                            <div className="inline-flex items-center overflow-hidden rounded-xl border border-[#E6DEC3] bg-white shadow-sm">
+                            <div className="inline-flex items-center overflow-hidden rounded-xl border border-[#E6DEC3] bg-white shadow-sm transition focus-within:border-[#DFA900] focus-within:ring-4 focus-within:ring-[#DFA900]/15">
                               <button
                                 type="button"
                                 aria-label="Decrease quantity"
@@ -1692,7 +1998,7 @@ function Sales() {
                                     item.quantity - 1
                                   )
                                 }
-                                className="flex h-10 w-10 items-center justify-center text-[#003B16] transition hover:bg-[#FFF1C2] active:bg-[#FFE48A]"
+                                className="flex h-11 w-11 items-center justify-center text-[#003B16] transition hover:bg-[#FFF1C2] active:bg-[#FFE48A] focus-visible:bg-[#FFF1C2] focus-visible:outline-none sm:h-10 sm:w-10"
                               >
                                 <Icon
                                   name="minus"
@@ -1705,7 +2011,7 @@ function Sales() {
                                 type="number"
                                 min="1"
                                 max={item.availableStock}
-                                className="h-10 w-14 border-x border-[#EFE8CF] text-center text-base font-extrabold tabular-nums text-[#003B16] outline-none focus:bg-[#FFFBEA] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                className="h-11 w-14 border-x border-[#EFE8CF] text-center text-base font-extrabold tabular-nums text-[#003B16] outline-none focus:bg-[#FFFBEA] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none sm:h-10"
                                 value={item.quantity}
                                 onChange={(e) =>
                                   updateCartItem(
@@ -1726,7 +2032,7 @@ function Sales() {
                                     item.quantity + 1
                                   )
                                 }
-                                className="flex h-10 w-10 items-center justify-center text-[#003B16] transition hover:bg-[#FFF1C2] active:bg-[#FFE48A]"
+                                className="flex h-11 w-11 items-center justify-center text-[#003B16] transition hover:bg-[#FFF1C2] active:bg-[#FFE48A] focus-visible:bg-[#FFF1C2] focus-visible:outline-none sm:h-10 sm:w-10"
                               >
                                 <Icon
                                   name="plus"
@@ -1796,7 +2102,7 @@ function Sales() {
                   <input
                     type="number"
                     min="0"
-                    className="w-36 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none transition focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25"
+                    className="min-h-[44px] w-36 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none transition placeholder:text-[#9AA59C] focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25"
                     placeholder="₹0"
                     value={discount}
                     onChange={(e) => setDiscount(e.target.value)}
@@ -1806,18 +2112,18 @@ function Sales() {
                 <div className="flex items-end justify-between border-t border-white/15 pt-4">
                   <span className="font-bold text-white">Grand Total</span>
 
-                  <span className="text-3xl font-extrabold tabular-nums text-[#FFD75A]">
+                  <span className="sales-text-glow text-3xl font-extrabold tabular-nums text-[#FFD75A]">
                     {money(grandTotal)}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
                   <label className="font-medium text-white/70">GST Rate (%)</label>
-                  <input type="number" min="0" max="100" step="0.01" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="w-36 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none" placeholder="0" />
+                  <input type="number" min="0" max="100" step="0.01" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="min-h-[44px] w-36 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none transition placeholder:text-[#9AA59C] focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25" placeholder="0" />
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <label className="font-medium text-white/70">Place of Supply</label>
-                  <select value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className="w-48 rounded-lg bg-white px-3 py-2 text-sm font-bold text-[#001F0B]"><option>Andhra Pradesh</option><option>Other State</option></select>
+                  <select value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className="min-h-[44px] w-48 max-w-[55%] rounded-lg border border-white/10 bg-white px-3 py-2 text-sm font-bold text-[#001F0B] outline-none transition focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25"><option>Andhra Pradesh</option><option>Other State</option></select>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-[#FFD75A]"><span>GST Amount</span><strong>{money(gstAmount)}</strong></div>
                 <div className="flex items-center justify-between gap-4">
@@ -1830,7 +2136,7 @@ function Sales() {
                       type="button"
                       disabled={grandTotal <= 0}
                       onClick={() => setPaidAmount(String(grandTotal))}
-                      className="rounded-lg border border-[#FFD75A]/40 px-2.5 py-2 text-xs font-bold text-[#FFD75A] transition hover:bg-[#FFD75A]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="min-h-[44px] rounded-lg border border-[#FFD75A]/40 px-3 py-2 text-xs font-bold text-[#FFD75A] transition hover:bg-[#FFD75A]/10 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFD75A]/30 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       Full
                     </button>
@@ -1838,7 +2144,7 @@ function Sales() {
                     <input
                       type="number"
                       min="0"
-                      className="w-32 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none transition focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25"
+                      className="min-h-[44px] w-32 rounded-lg border border-white/10 bg-white px-3 py-2 text-right font-bold text-[#001F0B] outline-none transition placeholder:text-[#9AA59C] focus:border-[#FFD75A] focus:ring-4 focus:ring-[#FFD75A]/25"
                       placeholder="₹0"
                       value={paidAmount}
                       onChange={(e) => setPaidAmount(e.target.value)}
@@ -1871,7 +2177,7 @@ function Sales() {
                 type="button"
                 onClick={handleGenerateBill}
                 disabled={cart.length === 0 || savingBill}
-                className={`${goldButtonClass} relative mt-5 w-full py-4 text-base disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0`}
+                className={`${goldButtonClass} sales-glow relative mt-5 w-full py-4 text-base disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0`}
               >
                 <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
@@ -1894,7 +2200,7 @@ function Sales() {
         </div>
 
         {/* RECENTLY SOLD BILLS */}
-        <section className={`no-print p-4 sm:p-6 ${cardClass}`}>
+        <section className={`no-print sales-enter p-4 sm:p-6 ${cardClass}`}>
           <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-2xl font-extrabold text-[#003B16]">
@@ -1920,7 +2226,7 @@ function Sales() {
             <button
               type="button"
               onClick={() => refreshData?.()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFA900]/60 bg-[#FFF8E1] px-4 py-3 text-sm font-bold text-[#7A5A00] transition hover:-translate-y-0.5 hover:bg-[#FFF1C2] hover:shadow-md"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFA900]/60 bg-[#FFF8E1] px-4 py-3 text-sm font-bold text-[#7A5A00] transition hover:-translate-y-0.5 hover:bg-[#FFF1C2] hover:shadow-md active:translate-y-0 active:scale-[0.98] min-h-[44px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30"
             >
               <Icon name="refresh" className="h-4 w-4" />
               Refresh Sales
@@ -1975,7 +2281,7 @@ function Sales() {
                   key={status}
                   type="button"
                   onClick={() => setStatusFilter(status)}
-                  className={`min-h-[52px] rounded-xl px-5 text-sm font-bold transition ${
+                  className={`min-h-[52px] select-none rounded-xl px-5 text-sm font-bold transition duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#DFA900]/30 ${
                     statusFilter === status
                       ? "bg-gradient-to-b from-[#0A4F24] to-[#003B16] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40"
                       : "border border-[#E6DEC3] bg-white text-[#003B16] hover:border-[#DFA900]/60 hover:bg-[#FFF8E1]"
@@ -2010,7 +2316,7 @@ function Sales() {
               </p>
             </div>
           ) : sortedSales.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-10 text-center">
+            <div className="sales-enter rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-10 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40">
                 <Icon name="receipt" className="h-6 w-6" />
               </div>
@@ -2022,7 +2328,7 @@ function Sales() {
               </p>
             </div>
           ) : filteredSales.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-10 text-center">
+            <div className="sales-enter rounded-2xl border border-dashed border-[#DFA900]/50 bg-[#FFFBEA] p-10 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40">
                 <Icon name="search" className="h-6 w-6" />
               </div>
@@ -2034,7 +2340,7 @@ function Sales() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="sales-stagger space-y-4">
               {filteredSales.map((bill) => {
                 const billId = bill.id || bill._id || bill.billNumber;
                 const isExpanded = expandedBills.includes(billId);
@@ -2050,14 +2356,14 @@ function Sales() {
                     className={`overflow-hidden rounded-2xl border bg-white transition duration-200 ${
                       isExpanded
                         ? "border-[#DFA900]/60 shadow-md"
-                        : "border-[#E6DEC3] hover:border-[#DFA900]/50 hover:shadow-md"
+                        : "border-[#E6DEC3] hover:-translate-y-0.5 hover:border-[#DFA900]/60 hover:shadow-lg"
                     }`}
                   >
                     <button
                       type="button"
                       onClick={() => toggleBill(billId)}
                       aria-expanded={isExpanded}
-                      className="flex w-full flex-col gap-4 bg-gradient-to-r from-[#FFF8E1]/60 to-white p-4 text-left sm:flex-row sm:items-center sm:justify-between sm:p-5"
+                      className="group flex w-full flex-col gap-4 bg-gradient-to-r from-[#FFF8E1]/60 to-white p-4 text-left transition-colors duration-200 hover:from-[#FFF1C2]/70 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#DFA900]/30 sm:flex-row sm:items-center sm:justify-between sm:p-5"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -2066,12 +2372,12 @@ function Sales() {
                           </h3>
 
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${
                               status === "Paid"
-                                ? "bg-green-100 text-green-800"
+                                ? "bg-green-100 text-green-800 ring-green-200"
                                 : status === "Partial"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-red-100 text-red-700"
+                                  ? "sales-ring-amber bg-amber-100 text-amber-800 ring-amber-200"
+                                  : "sales-ring-red bg-red-100 text-red-700 ring-red-200"
                             }`}
                           >
                             {status}
@@ -2110,7 +2416,7 @@ function Sales() {
                           </p>
                         </div>
 
-                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#FFF1C2] px-3 py-2 text-sm font-bold text-[#7A5A00]">
+                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#FFF1C2] px-3 py-2 text-sm font-bold text-[#7A5A00] transition-colors group-hover:bg-[#FFE48A]">
                           {isExpanded ? "Hide" : "View"}
                           <Icon
                             name="chevron"
@@ -2124,11 +2430,11 @@ function Sales() {
                     </button>
 
                     {isExpanded && (
-                      <div className="border-t border-[#EFE8CF] bg-[#FFFDF5] p-4 sm:p-5">
+                      <div className="sales-expand border-t border-[#EFE8CF] bg-[#FFFDF5] p-4 sm:p-5">
                         <div className="mb-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => printBill("customer", bill)} className={greenButtonClass}>Print Customer Bill</button>
                           <button type="button" onClick={() => printBill("gst", bill)} className={goldButtonClass}>Print GST Invoice</button>
-                          <button type="button" onClick={() => handleDeleteBill(bill)} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white">Permanently Delete</button>
+                          <button type="button" onClick={() => handleDeleteBill(bill)} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-red-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30">Permanently Delete</button>
                         </div>
                         <h4 className="mb-3 font-extrabold text-[#003B16]">
                           Sold Products
@@ -2364,7 +2670,7 @@ function Sales() {
             </section>
 
             <div
-              className={`no-print overflow-hidden ${cardClass} ring-1 ring-[#DFA900]/30`}
+              className={`no-print sales-enter overflow-hidden ${cardClass} ring-1 ring-[#DFA900]/30`}
             >
               <div className="flex flex-col gap-5 bg-gradient-to-r from-[#FFF8E1] to-[#FFFDF5] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                 <div className="flex items-center gap-4">

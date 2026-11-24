@@ -195,6 +195,7 @@ function ManufacturerPayments() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [printSupplierOnly, setPrintSupplierOnly] = useState(false);
 
   const [supplierForm, setSupplierForm] = useState({
     name: "",
@@ -281,6 +282,21 @@ function ManufacturerPayments() {
       document.body.style.overflow = "";
     };
   }, [modalOpen]);
+
+  /* Print only the selected supplier after React updates the print report */
+  useEffect(() => {
+    if (!printSupplierOnly) return;
+
+    const handleAfterPrint = () => setPrintSupplierOnly(false);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    const timer = window.setTimeout(() => window.print(), 100);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, [printSupplierOnly]);
 
   /* ================= SELECTED SUPPLIER ================= */
 
@@ -602,7 +618,7 @@ function ManufacturerPayments() {
 
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={exportSuppliersCSV} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Export Excel</button>
-            <button type="button" onClick={() => window.print()} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Print A4</button>
+            <button type="button" onClick={() => { setPrintSupplierOnly(false); window.print(); }} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Print All A4</button>
           <button
             onClick={() => setShowSupplierModal(true)}
             className="rounded-xl bg-[#5B3A29] px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-[#42291E]"
@@ -848,6 +864,14 @@ function ManufacturerPayments() {
                           className="rounded-lg border border-[#D9C9B5] px-4 py-2.5 text-xs font-bold text-[#5B3A29]"
                         >
                           Payment History
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPrintSupplierOnly(true)}
+                          className="rounded-lg border border-[#A17C42] bg-[#F8F2E6] px-4 py-2.5 text-xs font-bold text-[#5B3A29] hover:bg-[#EFE3CC]"
+                        >
+                          Print Supplier
                         </button>
                       </div>
 
@@ -1571,9 +1595,76 @@ function ManufacturerPayments() {
         </Modal>
       )}
       <div className="supplier-print-report">
-        <h1>Supplier Accounts Report</h1>
-        <table><thead><tr><th>Supplier</th><th>Phone</th><th>Purchase</th><th>Paid</th><th>Balance</th><th>Invoice</th><th>Date</th><th>Bill Amount</th><th>Bill Paid</th><th>Bill Balance</th></tr></thead>
-        <tbody>{suppliers.flatMap(supplier => supplier.purchases.length ? supplier.purchases.map(bill => { const sum=getSummary(supplier); const bs=getBillSummary(bill); return <tr key={`${supplier.id}-${bill.id}`}><td>{supplier.name}</td><td>{supplier.phone}</td><td>{money(sum.totalPurchase)}</td><td>{money(sum.totalPaid)}</td><td>{money(sum.balance)}</td><td>{bill.invoiceNumber || "-"}</td><td>{formatDate(bill.purchaseDate)}</td><td>{money(bs.totalPurchase)}</td><td>{money(bs.totalPaid)}</td><td>{money(bs.balance)}</td></tr>; }) : (() => { const sum=getSummary(supplier); return [<tr key={supplier.id}><td>{supplier.name}</td><td>{supplier.phone}</td><td>{money(sum.totalPurchase)}</td><td>{money(sum.totalPaid)}</td><td>{money(sum.balance)}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>]; })())}</tbody></table>
+        <h1>
+          {printSupplierOnly && selectedSupplier
+            ? `${selectedSupplier.name} - Supplier Account Statement`
+            : "Supplier Accounts Report"}
+        </h1>
+        {(() => {
+          const reportSuppliers = printSupplierOnly
+            ? selectedSupplier ? [selectedSupplier] : []
+            : suppliers;
+
+          return (
+            <table>
+              <thead>
+                <tr>
+                  <th>Supplier</th>
+                  <th>Phone</th>
+                  <th>Purchase</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                  <th>Invoice</th>
+                  <th>Date</th>
+                  <th>Bill Amount</th>
+                  <th>Bill Paid</th>
+                  <th>Bill Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportSuppliers.flatMap((supplier) => {
+                  const sum = getSummary(supplier);
+
+                  if (!supplier.purchases.length) {
+                    return [
+                      <tr key={supplier.id}>
+                        <td>{supplier.name}</td>
+                        <td>{supplier.phone}</td>
+                        <td>{money(sum.totalPurchase)}</td>
+                        <td>{money(sum.totalPaid)}</td>
+                        <td>{money(sum.balance)}</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                      </tr>,
+                    ];
+                  }
+
+                  return supplier.purchases.map((bill) => {
+                    const billSummary = getBillSummary(bill);
+
+                    return (
+                      <tr key={`${supplier.id}-${bill.id}`}>
+                        <td>{supplier.name}</td>
+                        <td>{supplier.phone}</td>
+                        <td>{money(sum.totalPurchase)}</td>
+                        <td>{money(sum.totalPaid)}</td>
+                        <td>{money(sum.balance)}</td>
+                        <td>{bill.invoiceNumber || "-"}</td>
+                        <td>{formatDate(bill.purchaseDate)}</td>
+                        <td>{money(billSummary.totalPurchase)}</td>
+                        <td>{money(billSummary.totalPaid)}</td>
+                        <td>{money(billSummary.balance)}</td>
+                      </tr>
+                    );
+                  });
+                })}
+              </tbody>
+            </table>
+          );
+        })()}
       </div>
       <style>{`@media print { @page { size: A4 landscape; margin: 10mm; } body * { visibility: hidden !important; } .supplier-print-report, .supplier-print-report * { visibility: visible !important; } .supplier-print-report { display:block !important; position:absolute; inset:0; width:100%; color:#000; font-size:9pt; } .supplier-print-report h1 { font-size:16pt; margin-bottom:12px; } .supplier-print-report table { width:100%; border-collapse:collapse; } .supplier-print-report th,.supplier-print-report td { border:1px solid #555; padding:5px; text-align:left; } .supplier-print-report th { background:#eee !important; } } .supplier-print-report { display:none; }`}</style>
     </div>
