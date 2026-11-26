@@ -345,8 +345,6 @@ function Sales() {
   const [savingBill, setSavingBill] = useState(false);
   const [expandedBills, setExpandedBills] = useState([]);
   const [editingBill, setEditingBill] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const [savingEdit, setSavingEdit] = useState(false);
 
   const [historySearch, setHistorySearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -878,7 +876,7 @@ function Sales() {
     setMessage("");
 
     try {
-      const result = await recordBill({
+      const billPayload = {
         billNumber: billNumber.trim(),
         date: billDate,
         items: cart.map((item) => ({
@@ -886,6 +884,7 @@ function Sales() {
           variantId: item.variantId || null,
           sizeId: item.sizeId || null,
           warranty: item.warranty || "",
+          color: item.color || "",
           quantity: item.quantity,
           sellingPrice: Number(item.sellingPrice),
         })),
@@ -895,16 +894,22 @@ function Sales() {
         paidAmount: paid,
         gstRate: Number(gstRate || 0),
         placeOfSupply,
-      });
+      };
+
+      const result = editingBill
+        ? await updateBill(editingBill.id || editingBill._id, billPayload)
+        : await recordBill(billPayload);
 
       if (!result?.success || !(result.bill || result.sale)) {
-        setMessage(result?.message || "Unable to generate bill.");
+        setMessage(result?.message || (editingBill ? "Unable to update bill." : "Unable to generate bill."));
         return;
       }
 
-      setLastBill(result.bill || result.sale);
+      const savedBill = result.bill || result.sale;
+      setLastBill(savedBill);
+      setEditingBill(null);
 
-      if (refreshData) {
+      if (!editingBill && refreshData) {
         await refreshData();
       }
 
@@ -923,8 +928,10 @@ function Sales() {
       resetFromCompany();
 
       setStockWarning("");
-      setMessage("Bill generated successfully! Sold items updated.");
-      // Wait for the generated-bill print panel to render, then bring it into view.
+      setMessage(editingBill
+        ? "Bill updated successfully! Stock and sales history refreshed."
+        : "Bill generated successfully! Sold items updated.");
+      // Wait for the saved-bill print panel to render, then bring it into view.
       window.setTimeout(() => {
         document
           .getElementById("generated-bill-print-actions")
@@ -938,111 +945,92 @@ function Sales() {
   };
 
   const openBillEditor = (bill) => {
+    const billId = bill.id || bill._id;
     setEditingBill(bill);
-    setEditForm({
-      billNumber: bill.billNumber || "",
-      date: getBillDateKey(bill) || getTodayDate(),
-      customerName: bill.customerName || "",
-      customerMobile: bill.customerMobile || "",
-      discount: String(bill.discount ?? 0),
-      paidAmount: String(bill.paidAmount ?? 0),
-      gstRate: String(bill.gstRate ?? 0),
-      placeOfSupply: bill.placeOfSupply || "Andhra Pradesh",
-      items: (bill.items || []).map((item) => ({
-        productId: item.productId,
-        sizeId: item.sizeId || null,
-        variantId: item.variantId || null,
-        productName: item.productName || item.name || "Product",
-        sizeName: item.sizeName || "",
+    setBillNumber(bill.billNumber || "");
+    setBillDate(getBillDateKey(bill) || getTodayDate());
+    setCustomerName(bill.customerName || "");
+    setCustomerMobile(bill.customerMobile || "");
+    setDiscount(String(bill.discount ?? 0));
+    setPaidAmount(String(bill.paidAmount ?? 0));
+    setGstRate(String(bill.gstRate ?? 0));
+    setPlaceOfSupply(bill.placeOfSupply || "Andhra Pradesh");
+
+    const restoredCart = (bill.items || []).map((item, index) => {
+      const productId = item.productId?._id || item.productId?.id || item.productId;
+      const product = products.find(
+        (entry) => String(entry.id || entry._id) === String(productId)
+      );
+      const sizeId = item.sizeId?._id || item.sizeId?.id || item.sizeId || null;
+      const variantId = item.variantId?._id || item.variantId?.id || item.variantId || null;
+
+      const sizeRecord = product?.sizes?.find(
+        (size) => String(size.id || size._id) === String(sizeId)
+      );
+      const variantRecord = product?.variants?.find(
+        (variant) => String(variant.id || variant._id) === String(variantId)
+      );
+      const legacySizeRecord = variantRecord?.sizes?.find(
+        (size) => String(size.id || size._id) === String(sizeId)
+      );
+      const stockRecord = sizeRecord || legacySizeRecord || variantRecord;
+      const currentStock = Number(stockRecord?.quantity ?? product?.quantity ?? 0);
+      const oldQuantity = Number(item.quantity || 1);
+
+      return {
+        key: `editing-${billId}-${index}`,
+        productId,
+        sizeId,
+        variantId,
+        productName: item.productName || item.name || product?.name || "Product",
+        category: item.category || item.categoryName || product?.categoryName || textOf(product?.category) || "",
+        company: item.company || item.companyName || getProductCompany(product || {}),
+        modelName: item.modelName || getProductModel(product || { name: item.productName || item.name }),
         variantName: item.variantName || "",
+        sizeName: item.sizeName || "",
+        color: item.color || "",
         warranty: item.warranty || "",
-        quantity: String(item.quantity ?? 1),
+        mrp: Number(item.mrp ?? stockRecord?.mrp ?? product?.mrp ?? 0),
+        purchasePrice: Number(item.purchasePrice ?? stockRecord?.purchasePrice ?? product?.purchasePrice ?? 0),
         sellingPrice: String(item.sellingPrice ?? 0),
-      })),
+        // The old bill already reduced stock. Add its old quantity back only
+        // for the editor's allowed-quantity calculation; the server performs
+        // the real restore-and-deduct operation when Update Bill is saved.
+        availableStock: currentStock + oldQuantity,
+        quantity: oldQuantity,
+      };
     });
-    setMessage("");
-  };
 
-  const closeBillEditor = () => {
-    if (savingEdit) return;
-    setEditingBill(null);
-    setEditForm(null);
-  };
+    setCart(restoredCart);
+    setCategorySearch("");
+    setSelectedCategory(null);
+    resetFromCompany();
+    setLastBill(null);
+    setMessage(`Editing bill ${bill.billNumber || ""}. Make changes below and select Update Bill.`);
+    setStockWarning("");
+    setExpandedBills((previous) => previous.filter((id) => String(id) !== String(billId)));
 
-  const updateEditField = (field, value) => {
-    setEditForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const updateEditItem = (index, field, value) => {
-    setEditForm((current) => ({
-      ...current,
-      items: current.items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item
-      ),
-    }));
-  };
-
-  const saveBillChanges = async () => {
-    if (!editingBill || !editForm || savingEdit) return;
-
-    if (!editForm.billNumber.trim()) {
-      setMessage("Please enter a bill number.");
-      return;
-    }
-    if (!editForm.date) {
-      setMessage("Please select a bill date.");
-      return;
-    }
-    if (!editForm.items.length) {
-      setMessage("A bill must contain at least one product.");
-      return;
-    }
-    if (editForm.items.some((item) =>
-      !Number.isInteger(Number(item.quantity)) ||
-      Number(item.quantity) < 1 ||
-      !Number.isFinite(Number(item.sellingPrice)) ||
-      Number(item.sellingPrice) <= 0
-    )) {
-      setMessage("Check product quantities and selling prices.");
-      return;
-    }
-
-    setSavingEdit(true);
-    setMessage("");
-    try {
-      const result = await updateBill(editingBill.id || editingBill._id, {
-        billNumber: editForm.billNumber.trim(),
-        date: editForm.date,
-        customerName: editForm.customerName,
-        customerMobile: editForm.customerMobile,
-        discount: Number(editForm.discount || 0),
-        paidAmount: Number(editForm.paidAmount || 0),
-        gstRate: Number(editForm.gstRate || 0),
-        placeOfSupply: editForm.placeOfSupply,
-        items: editForm.items.map((item) => ({
-          productId: item.productId,
-          sizeId: item.sizeId || null,
-          variantId: item.variantId || null,
-          warranty: item.warranty || "",
-          quantity: Number(item.quantity),
-          sellingPrice: Number(item.sellingPrice),
-        })),
+    window.setTimeout(() => {
+      document.getElementById("customer-billing-form")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
       });
+    }, 100);
+  };
 
-      if (!result?.success) {
-        setMessage(result?.message || "Unable to update bill.");
-        return;
-      }
-
-      setLastBill(result.bill || result.sale || editingBill);
-      setEditingBill(null);
-      setEditForm(null);
-      setMessage("Bill updated successfully. Product stock and sales totals are refreshed.");
-    } catch (error) {
-      setMessage(error.message || "Unable to update bill.");
-    } finally {
-      setSavingEdit(false);
-    }
+  const cancelBillEdit = () => {
+    if (savingBill) return;
+    setEditingBill(null);
+    setCart([]);
+    setBillNumber("");
+    setBillDate(getTodayDate());
+    setCustomerName("");
+    setCustomerMobile("");
+    setDiscount("");
+    setPaidAmount("");
+    setGstRate("0");
+    setPlaceOfSupply("Andhra Pradesh");
+    setMessage("Bill editing cancelled.");
   };
 
   const toggleBill = (billId) => {
@@ -2020,6 +2008,7 @@ function Sales() {
 
           {/* BILLING */}
           <section
+            id="customer-billing-form"
             className={`no-print sales-enter relative z-10 p-4 sm:p-6 xl:sticky xl:top-4 xl:max-h-[calc((100vh-2rem)/0.8)] xl:overflow-y-auto xl:overscroll-contain ${cardClass}`}
           >
             <div className="mb-6 flex items-center gap-3">
@@ -2029,11 +2018,11 @@ function Sales() {
 
               <div>
                 <h2 className="text-2xl font-extrabold text-[#003B16]">
-                  Customer Billing
+                  {editingBill ? `Update Bill ${editingBill.billNumber || ""}` : "Customer Billing"}
                 </h2>
 
                 <p className="mt-0.5 text-sm text-[#6B7A6F]">
-                  Customer details and cart
+                  {editingBill ? "Edit the existing bill details and products below" : "Customer details and cart"}
                 </p>
               </div>
             </div>
@@ -2391,11 +2380,22 @@ function Sales() {
                 </div>
               </div>
 
+              {editingBill && (
+                <button
+                  type="button"
+                  onClick={cancelBillEdit}
+                  disabled={savingBill}
+                  className="mt-5 w-full rounded-xl border border-[#D8CFB5] px-4 py-3 text-sm font-bold text-[#405247] hover:bg-[#F8F4E8] disabled:opacity-50"
+                >
+                  Cancel Editing
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleGenerateBill}
                 disabled={cart.length === 0 || savingBill}
-                className={`${goldButtonClass} sales-glow relative mt-5 w-full py-4 text-base disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0`}
+                className={`${goldButtonClass} sales-glow relative mt-3 w-full py-4 text-base disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0`}
               >
                 <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
@@ -2403,12 +2403,12 @@ function Sales() {
                   {savingBill ? (
                     <>
                       <Spinner />
-                      Generating Bill...
+                      {editingBill ? "Updating Bill..." : "Generating Bill..."}
                     </>
                   ) : (
                     <>
                       <Icon name="receipt" className="h-5 w-5" />
-                      Generate Bill
+                      {editingBill ? "Update Bill" : "Generate Bill"}
                     </>
                   )}
                 </span>
@@ -2751,83 +2751,6 @@ function Sales() {
           )}
         </section>
 
-        {/* EDIT BILL MODAL */}
-        {editingBill && editForm && (
-          <div className="no-print fixed inset-0 z-[100] flex items-center justify-center bg-[#001F0B]/70 p-3 backdrop-blur-sm sm:p-6">
-            <div className="max-h-[94vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-[#DFA900]/50 bg-[#FFFDF5] shadow-2xl">
-              <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#001F0B] to-[#0A4F24] px-5 py-4 text-white">
-                <div>
-                  <h2 className="text-lg font-extrabold text-[#FFD75A]">Edit Bill</h2>
-                  <p className="text-xs text-white/75">Correct bill details and sold products</p>
-                </div>
-                <button type="button" onClick={closeBillEditor} disabled={savingEdit} className="rounded-lg bg-white/10 px-3 py-2 text-sm font-bold hover:bg-white/20">Close</button>
-              </div>
-
-              <div className="max-h-[calc(94vh-132px)] space-y-5 overflow-y-auto p-4 sm:p-6">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {[
-                    ["Bill Number", "billNumber", "text"],
-                    ["Bill Date", "date", "date"],
-                    ["Customer Name", "customerName", "text"],
-                    ["Mobile Number", "customerMobile", "tel"],
-                    ["Discount", "discount", "number"],
-                    ["Paid Amount", "paidAmount", "number"],
-                    ["GST Rate (%)", "gstRate", "number"],
-                    ["Place of Supply", "placeOfSupply", "text"],
-                  ].map(([label, field, type]) => (
-                    <label key={field} className="block">
-                      <span className="mb-1.5 block text-xs font-bold text-[#31513B]">{label}</span>
-                      <input
-                        type={type}
-                        min={type === "number" ? "0" : undefined}
-                        step={type === "number" ? "0.01" : undefined}
-                        value={editForm[field]}
-                        onChange={(event) => updateEditField(field, event.target.value)}
-                        className="min-h-11 w-full rounded-lg border border-[#E6DEC3] bg-white px-3 py-2 text-sm font-semibold text-[#001F0B] outline-none focus:border-[#DFA900] focus:ring-2 focus:ring-[#DFA900]/20"
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <div>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <h3 className="font-extrabold text-[#003B16]">Bill Products</h3>
-                    <span className="text-xs text-[#6B7A6F]">{editForm.items.length} items</span>
-                  </div>
-                  <div className="space-y-3">
-                    {editForm.items.map((item, index) => (
-                      <div key={`${item.productId}-${item.sizeId || item.variantId || index}`} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-[#E6DEC3] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_110px_140px_auto]">
-                        <div className="min-w-0">
-                          <p className="font-bold text-[#003B16]">{item.productName}</p>
-                          <p className="mt-1 text-xs text-[#7B887E]">{[item.variantName, item.sizeName].filter(Boolean).join(" / ") || "General Stock"}</p>
-                        </div>
-                        <label>
-                          <span className="mb-1 block text-xs font-bold text-[#31513B]">Quantity</span>
-                          <input type="number" min="1" step="1" value={item.quantity} onChange={(event) => updateEditItem(index, "quantity", event.target.value)} className="min-h-10 w-full rounded-lg border border-[#E6DEC3] px-3 py-2 text-sm font-semibold outline-none focus:border-[#DFA900]" />
-                        </label>
-                        <label>
-                          <span className="mb-1 block text-xs font-bold text-[#31513B]">Selling Price</span>
-                          <input type="number" min="0.01" step="0.01" value={item.sellingPrice} onChange={(event) => updateEditItem(index, "sellingPrice", event.target.value)} className="min-h-10 w-full rounded-lg border border-[#E6DEC3] px-3 py-2 text-sm font-semibold outline-none focus:border-[#DFA900]" />
-                        </label>
-                        <button type="button" onClick={() => setEditForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))} className="min-h-10 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100">Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-[#7B887E]">You can change quantity and selling price or remove an existing product. Stock will be recalculated when you save.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E6DEC3] bg-white px-4 py-3 sm:px-6">
-                <p className="text-xs text-[#7B887E]">Saving updates the bill and product stock together.</p>
-                <div className="flex gap-2">
-                  <button type="button" onClick={closeBillEditor} disabled={savingEdit} className="rounded-xl border border-[#D8CFB5] px-4 py-2.5 text-sm font-bold text-[#405247] hover:bg-[#F8F4E8]">Cancel</button>
-                  <button type="button" onClick={saveBillChanges} disabled={savingEdit} className={greenButtonClass}>{savingEdit ? "Saving..." : "Save Changes"}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* PRINT ALL CUSTOMER SALES REPORT */}
         <section className="sales-report-print fixed -left-[10000px] top-0 w-[190mm] bg-white p-0 text-black">
           <div className="mb-5 border-b-2 border-[#003B16] pb-3">
@@ -2900,7 +2823,6 @@ function Sales() {
                       <th className="text-left">Size / Type</th>
                       <th className="text-left">Warranty</th>
                       <th className="text-right">Qty</th>
-                      <th className="text-right">MRP</th>
                       <th className="text-right">Selling Price</th>
                       <th className="text-right">Total</th>
                     </tr>
@@ -2917,7 +2839,6 @@ function Sales() {
                         </td>
                         <td className="font-semibold">{item.warranty || "-"}</td>
                         <td className="text-right">{Number(item.quantity || 0)}</td>
-                        <td className="text-right">{money(item.mrp)}</td>
                         <td className="text-right">{money(item.sellingPrice)}</td>
                         <td className="text-right">
                           {money(item.totalAmount ?? Number(item.sellingPrice || 0) * Number(item.quantity || 0))}
@@ -2925,7 +2846,7 @@ function Sales() {
                       </tr>
                     ))}
                     {reportItems.length === 0 && (
-                      <tr><td colSpan={8} className="text-center">No product details stored for this bill.</td></tr>
+                      <tr><td colSpan={7} className="text-center">No product details stored for this bill.</td></tr>
                     )}
                   </tbody>
                 </table>
