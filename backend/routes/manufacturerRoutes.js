@@ -1,4 +1,3 @@
-
 const express = require("express");
 const router = express.Router();
 
@@ -7,7 +6,9 @@ const {
   getManufacturers,
   getManufacturerById,
   addPurchase,
+  updatePurchase,
   addPayment,
+  updatePayment,
   updateManufacturer,
   deleteManufacturer,
 } = require("../controllers/manufacturerController");
@@ -21,8 +22,10 @@ router.delete("/:id", deleteManufacturer);
 
 // Purchase APIs
 router.post("/:id/purchases", addPurchase);
+router.put("/:id/purchases/:purchaseId", updatePurchase);
 
-// Payment API for a specific purchase bill
+// Payment APIs for a specific purchase bill
 router.post("/:id/purchases/:purchaseId/payments", addPayment);
+router.put("/:id/purchases/:purchaseId/payments/:paymentId", updatePayment);
 
 module.exports = router;

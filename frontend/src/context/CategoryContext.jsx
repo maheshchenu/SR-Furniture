@@ -25,7 +25,6 @@ export function CategoryProvider({ children }) {
       const response = await api.get("/api/categories");
 
       const data = response.data;
-
       const categoryList = data.categories || [];
 
       setCategories(
@@ -34,16 +33,14 @@ export function CategoryProvider({ children }) {
           id: category._id,
         }))
       );
-
     } catch (error) {
       console.error("Fetch Categories Error:", error);
 
       setError(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to fetch categories"
+          error.message ||
+          "Failed to fetch categories"
       );
-
     } finally {
       setLoading(false);
     }
@@ -70,14 +67,45 @@ export function CategoryProvider({ children }) {
       setCategories((prev) => [...prev, newCategory]);
 
       return newCategory;
-
     } catch (error) {
       console.error("Add Category Error:", error);
 
       throw new Error(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to add category"
+          error.message ||
+          "Failed to add category"
+      );
+    }
+  };
+
+  // Update category in MongoDB
+  const updateCategory = async (id, name) => {
+    try {
+      const response = await api.put(`/api/categories/${id}`, {
+        name,
+      });
+
+      const data = response.data;
+
+      const updatedCategory = {
+        ...data.category,
+        id: data.category?._id || id,
+      };
+
+      setCategories((prev) =>
+        prev.map((category) =>
+          category.id === id ? { ...category, ...updatedCategory } : category
+        )
+      );
+
+      return updatedCategory;
+    } catch (error) {
+      console.error("Update Category Error:", error);
+
+      throw new Error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update category"
       );
     }
   };
@@ -94,17 +122,18 @@ export function CategoryProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Category and related products deleted successfully.",
+        message:
+          data.message ||
+          "Category and related products deleted successfully.",
         deletedProducts: data.deletedProducts || 0,
       };
-
     } catch (error) {
       console.error("Delete Category Error:", error);
 
       throw new Error(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to delete category"
+          error.message ||
+          "Failed to delete category"
       );
     }
   };
@@ -114,6 +143,7 @@ export function CategoryProvider({ children }) {
       value={{
         categories,
         addCategory,
+        updateCategory,
         deleteCategory,
         loading,
         error,

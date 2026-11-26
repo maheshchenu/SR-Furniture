@@ -308,6 +308,7 @@ function Sales() {
     products = [],
     sales = [],
     recordBill,
+    updateBill,
     deleteBill,
     loading,
     refreshData,
@@ -343,6 +344,9 @@ function Sales() {
   const [billPrintType, setBillPrintType] = useState("gst");
   const [savingBill, setSavingBill] = useState(false);
   const [expandedBills, setExpandedBills] = useState([]);
+  const [editingBill, setEditingBill] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [historySearch, setHistorySearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -881,6 +885,7 @@ function Sales() {
           productId: item.productId,
           variantId: item.variantId || null,
           sizeId: item.sizeId || null,
+          warranty: item.warranty || "",
           quantity: item.quantity,
           sellingPrice: Number(item.sellingPrice),
         })),
@@ -924,6 +929,114 @@ function Sales() {
       setMessage(error.message || "Unable to generate bill. Please try again.");
     } finally {
       setSavingBill(false);
+    }
+  };
+
+  const openBillEditor = (bill) => {
+    setEditingBill(bill);
+    setEditForm({
+      billNumber: bill.billNumber || "",
+      date: getBillDateKey(bill) || getTodayDate(),
+      customerName: bill.customerName || "",
+      customerMobile: bill.customerMobile || "",
+      discount: String(bill.discount ?? 0),
+      paidAmount: String(bill.paidAmount ?? 0),
+      gstRate: String(bill.gstRate ?? 0),
+      placeOfSupply: bill.placeOfSupply || "Andhra Pradesh",
+      items: (bill.items || []).map((item) => ({
+        productId: item.productId,
+        sizeId: item.sizeId || null,
+        variantId: item.variantId || null,
+        productName: item.productName || item.name || "Product",
+        sizeName: item.sizeName || "",
+        variantName: item.variantName || "",
+        warranty: item.warranty || "",
+        quantity: String(item.quantity ?? 1),
+        sellingPrice: String(item.sellingPrice ?? 0),
+      })),
+    });
+    setMessage("");
+  };
+
+  const closeBillEditor = () => {
+    if (savingEdit) return;
+    setEditingBill(null);
+    setEditForm(null);
+  };
+
+  const updateEditField = (field, value) => {
+    setEditForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateEditItem = (index, field, value) => {
+    setEditForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  const saveBillChanges = async () => {
+    if (!editingBill || !editForm || savingEdit) return;
+
+    if (!editForm.billNumber.trim()) {
+      setMessage("Please enter a bill number.");
+      return;
+    }
+    if (!editForm.date) {
+      setMessage("Please select a bill date.");
+      return;
+    }
+    if (!editForm.items.length) {
+      setMessage("A bill must contain at least one product.");
+      return;
+    }
+    if (editForm.items.some((item) =>
+      !Number.isInteger(Number(item.quantity)) ||
+      Number(item.quantity) < 1 ||
+      !Number.isFinite(Number(item.sellingPrice)) ||
+      Number(item.sellingPrice) <= 0
+    )) {
+      setMessage("Check product quantities and selling prices.");
+      return;
+    }
+
+    setSavingEdit(true);
+    setMessage("");
+    try {
+      const result = await updateBill(editingBill.id || editingBill._id, {
+        billNumber: editForm.billNumber.trim(),
+        date: editForm.date,
+        customerName: editForm.customerName,
+        customerMobile: editForm.customerMobile,
+        discount: Number(editForm.discount || 0),
+        paidAmount: Number(editForm.paidAmount || 0),
+        gstRate: Number(editForm.gstRate || 0),
+        placeOfSupply: editForm.placeOfSupply,
+        items: editForm.items.map((item) => ({
+          productId: item.productId,
+          sizeId: item.sizeId || null,
+          variantId: item.variantId || null,
+          warranty: item.warranty || "",
+          quantity: Number(item.quantity),
+          sellingPrice: Number(item.sellingPrice),
+        })),
+      });
+
+      if (!result?.success) {
+        setMessage(result?.message || "Unable to update bill.");
+        return;
+      }
+
+      setLastBill(result.bill || result.sale || editingBill);
+      setEditingBill(null);
+      setEditForm(null);
+      setMessage("Bill updated successfully. Product stock and sales totals are refreshed.");
+    } catch (error) {
+      setMessage(error.message || "Unable to update bill.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1235,8 +1348,8 @@ function Sales() {
 
         @media print {
           @page {
-            size: A4;
-            margin: 6mm;
+            size: A4 portrait;
+            margin: 8mm;
           }
 
           .sales-root {
@@ -1322,38 +1435,39 @@ function Sales() {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            width: 100% !important;
+            width: 194mm !important;
+            max-width: 194mm !important;
             min-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
             color: #111 !important;
             overflow: visible !important;
-            font-size: 7.5pt !important;
-            line-height: 1.15 !important;
+            font-size: 8.5pt !important;
+            line-height: 1.25 !important;
           }
 
           body.print-sales-report .sales-report-print > div:first-child {
-            margin-bottom: 3mm !important;
-            padding-bottom: 2mm !important;
+            margin-bottom: 4mm !important;
+            padding-bottom: 3mm !important;
           }
 
           body.print-sales-report .sales-report-print > div:nth-child(2) {
-            margin-bottom: 3mm !important;
-            gap: 2mm !important;
-            font-size: 8pt !important;
+            margin-bottom: 4mm !important;
+            gap: 3mm !important;
+            font-size: 9pt !important;
           }
 
           body.print-sales-report .sales-report-print img {
-            width: 14mm !important;
-            height: 14mm !important;
+            width: 17mm !important;
+            height: 17mm !important;
           }
 
           body.print-sales-report .sales-report-bill {
             break-inside: auto !important;
             page-break-inside: auto !important;
-            margin: 0 0 2mm !important;
-            padding: 0 0 1mm !important;
+            margin: 0 0 3mm !important;
+            padding: 0 0 2mm !important;
             border-bottom: 1px dashed #999 !important;
           }
 
@@ -1364,24 +1478,24 @@ function Sales() {
           }
 
           body.print-sales-report .sales-report-bill h3 {
-            font-size: 9pt !important;
-            line-height: 1.15 !important;
+            font-size: 10pt !important;
+            line-height: 1.2 !important;
             margin: 0 !important;
           }
 
           body.print-sales-report .sales-report-bill p,
           body.print-sales-report .sales-report-bill .text-xs {
-            font-size: 7pt !important;
-            line-height: 1.15 !important;
-            margin-top: 1px !important;
+            font-size: 8pt !important;
+            line-height: 1.25 !important;
+            margin-top: 2px !important;
           }
 
           body.print-sales-report .sales-report-bill table {
             width: 100% !important;
             border-collapse: collapse !important;
-            font-size: 7pt !important;
-            line-height: 1.1 !important;
-            margin: 1mm 0 !important;
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
+            margin: 1.5mm 0 !important;
           }
 
           body.print-sales-report .sales-report-bill thead {
@@ -1396,28 +1510,59 @@ function Sales() {
           body.print-sales-report .sales-report-bill th,
           body.print-sales-report .sales-report-bill td {
             border: 1px solid #b8b8b8 !important;
-            padding: 2px 3px !important;
-            vertical-align: top !important;
+            padding: 3px 4px !important;
+            vertical-align: middle !important;
           }
 
           body.print-sales-report .sales-report-totals {
             display: grid !important;
-            grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             width: 100% !important;
-            margin: 1mm 0 0 !important;
+            margin: 2mm 0 0 !important;
             gap: 2mm !important;
-            font-size: 6.5pt !important;
-            line-height: 1.15 !important;
+            font-size: 8pt !important;
+            line-height: 1.25 !important;
           }
 
           body.print-sales-report .sales-report-totals > div {
             display: flex !important;
             align-items: center !important;
             justify-content: space-between !important;
-            gap: 1mm !important;
+            gap: 2mm !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            min-width: 0 !important;
+            border: 1px solid #ccc !important;
+            border-radius: 2px !important;
+            padding: 2mm !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div strong:last-child {
             white-space: nowrap !important;
-            border-top: 1px solid #ccc !important;
-            padding-top: 1mm !important;
+            overflow: visible !important;
+            text-align: right !important;
+            font-variant-numeric: tabular-nums !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div:nth-child(4),
+          body.print-sales-report .sales-report-totals > div:nth-child(6) {
+            min-height: 10mm !important;
+            align-items: center !important;
+            font-size: 10pt !important;
+            font-weight: 800 !important;
+            border: 1.5px solid currentColor !important;
+            padding: 2.5mm !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div:nth-child(4) strong,
+          body.print-sales-report .sales-report-totals > div:nth-child(6) strong {
+            font-size: 10pt !important;
+            font-weight: 900 !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div:nth-child(4) strong:last-child,
+          body.print-sales-report .sales-report-totals > div:nth-child(6) strong:last-child {
+            font-size: 11pt !important;
           }
 
           body.print-sales-report .sales-report-bill .mt-2 {
@@ -1440,8 +1585,8 @@ function Sales() {
           }
 
           body.print-sales-report .sales-report-print > div:last-child {
-            margin-top: 2mm !important;
-            padding-top: 1mm !important;
+            margin-top: 4mm !important;
+            padding-top: 2mm !important;
           }
 
           body.print-customer .customer-print,
@@ -1478,7 +1623,37 @@ function Sales() {
           body.print-business .no-print {
             display: none !important;
           }
+
+          /* Keep the two most important bill amounts clearly readable on paper. */
+          body.print-customer .bill-grand-total {
+            min-height: 15mm !important;
+            padding: 3mm 4mm !important;
+            font-size: 18pt !important;
+            line-height: 1.2 !important;
+          }
+
+          body.print-customer .bill-paid-amount {
+            min-height: 13mm !important;
+            padding: 3mm 4mm !important;
+          }
+
+          body.print-customer .bill-total-label {
+            font-size: 15pt !important;
+            line-height: 1.2 !important;
+            font-weight: 800 !important;
+          }
+
+          body.print-customer .bill-total-value {
+            font-size: 18pt !important;
+            line-height: 1.2 !important;
+            font-weight: 900 !important;
+          }
         }
+
+        .bill-grand-total .bill-total-label { font-size: 18px; }
+        .bill-grand-total .bill-total-value { font-size: 24px; }
+        .bill-paid-amount .bill-total-label { font-size: 16px; }
+        .bill-paid-amount .bill-total-value { font-size: 22px; }
       `}</style>
 
       <div className="no-print sales-breath pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(223,169,0,0.10),transparent_65%)]" />
@@ -2432,6 +2607,7 @@ function Sales() {
                     {isExpanded && (
                       <div className="sales-expand border-t border-[#EFE8CF] bg-[#FFFDF5] p-4 sm:p-5">
                         <div className="mb-4 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => openBillEditor(bill)} className={goldButtonClass}>Edit Bill</button>
                           <button type="button" onClick={() => printBill("customer", bill)} className={greenButtonClass}>Print Customer Bill</button>
                           <button type="button" onClick={() => printBill("gst", bill)} className={goldButtonClass}>Print GST Invoice</button>
                           <button type="button" onClick={() => handleDeleteBill(bill)} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-red-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30">Permanently Delete</button>
@@ -2446,6 +2622,7 @@ function Sales() {
                               <tr>
                                 <th className="p-3">Product</th>
                                 <th className="p-3">Variant</th>
+                                <th className="p-3">Warranty</th>
                                 <th className="p-3 text-center">Qty</th>
                                 <th className="p-3 text-right">Selling Price</th>
                                 <th className="p-3 text-right">Total</th>
@@ -2467,6 +2644,7 @@ function Sales() {
                                       .filter(Boolean)
                                       .join(" / ") || "-"}
                                   </td>
+                                  <td className="p-3 font-semibold text-[#7A5A00]">{item.warranty || "-"}</td>
 
                                   <td className="p-3 text-center font-semibold tabular-nums text-[#183B2B]">
                                     {item.quantity}
@@ -2490,22 +2668,26 @@ function Sales() {
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <div className="rounded-xl border border-[#E6DEC3] bg-white p-4">
-                            <p className="text-xs font-semibold text-[#6B7A6F]">
-                              Grand Total
-                            </p>
-                            <p className="mt-1 text-xl font-extrabold tabular-nums text-[#003B16]">
-                              {money(billTotal)}
-                            </p>
+                          <div className="rounded-xl border-2 border-[#DFA900] bg-gradient-to-r from-[#FFF1B8] to-[#FFE082] p-4 shadow-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-extrabold uppercase tracking-wide text-[#725000]">
+                                Grand Total
+                              </p>
+                              <p className="text-2xl font-black tabular-nums text-[#003B16]">
+                                {money(billTotal)}
+                              </p>
+                            </div>
                           </div>
 
-                          <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                            <p className="text-xs font-semibold text-green-700">
-                              Paid Amount
-                            </p>
-                            <p className="mt-1 text-xl font-extrabold tabular-nums text-green-800">
-                              {money(billPaid)}
-                            </p>
+                          <div className="rounded-xl border-2 border-green-300 bg-green-50 p-4 shadow-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-extrabold uppercase tracking-wide text-green-700">
+                                Paid Amount
+                              </p>
+                              <p className="text-2xl font-black tabular-nums text-green-800">
+                                {money(billPaid)}
+                              </p>
+                            </div>
                           </div>
 
                           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -2525,6 +2707,83 @@ function Sales() {
             </div>
           )}
         </section>
+
+        {/* EDIT BILL MODAL */}
+        {editingBill && editForm && (
+          <div className="no-print fixed inset-0 z-[100] flex items-center justify-center bg-[#001F0B]/70 p-3 backdrop-blur-sm sm:p-6">
+            <div className="max-h-[94vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-[#DFA900]/50 bg-[#FFFDF5] shadow-2xl">
+              <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#001F0B] to-[#0A4F24] px-5 py-4 text-white">
+                <div>
+                  <h2 className="text-lg font-extrabold text-[#FFD75A]">Edit Bill</h2>
+                  <p className="text-xs text-white/75">Correct bill details and sold products</p>
+                </div>
+                <button type="button" onClick={closeBillEditor} disabled={savingEdit} className="rounded-lg bg-white/10 px-3 py-2 text-sm font-bold hover:bg-white/20">Close</button>
+              </div>
+
+              <div className="max-h-[calc(94vh-132px)] space-y-5 overflow-y-auto p-4 sm:p-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    ["Bill Number", "billNumber", "text"],
+                    ["Bill Date", "date", "date"],
+                    ["Customer Name", "customerName", "text"],
+                    ["Mobile Number", "customerMobile", "tel"],
+                    ["Discount", "discount", "number"],
+                    ["Paid Amount", "paidAmount", "number"],
+                    ["GST Rate (%)", "gstRate", "number"],
+                    ["Place of Supply", "placeOfSupply", "text"],
+                  ].map(([label, field, type]) => (
+                    <label key={field} className="block">
+                      <span className="mb-1.5 block text-xs font-bold text-[#31513B]">{label}</span>
+                      <input
+                        type={type}
+                        min={type === "number" ? "0" : undefined}
+                        step={type === "number" ? "0.01" : undefined}
+                        value={editForm[field]}
+                        onChange={(event) => updateEditField(field, event.target.value)}
+                        className="min-h-11 w-full rounded-lg border border-[#E6DEC3] bg-white px-3 py-2 text-sm font-semibold text-[#001F0B] outline-none focus:border-[#DFA900] focus:ring-2 focus:ring-[#DFA900]/20"
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="font-extrabold text-[#003B16]">Bill Products</h3>
+                    <span className="text-xs text-[#6B7A6F]">{editForm.items.length} items</span>
+                  </div>
+                  <div className="space-y-3">
+                    {editForm.items.map((item, index) => (
+                      <div key={`${item.productId}-${item.sizeId || item.variantId || index}`} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-[#E6DEC3] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_110px_140px_auto]">
+                        <div className="min-w-0">
+                          <p className="font-bold text-[#003B16]">{item.productName}</p>
+                          <p className="mt-1 text-xs text-[#7B887E]">{[item.variantName, item.sizeName].filter(Boolean).join(" / ") || "General Stock"}</p>
+                        </div>
+                        <label>
+                          <span className="mb-1 block text-xs font-bold text-[#31513B]">Quantity</span>
+                          <input type="number" min="1" step="1" value={item.quantity} onChange={(event) => updateEditItem(index, "quantity", event.target.value)} className="min-h-10 w-full rounded-lg border border-[#E6DEC3] px-3 py-2 text-sm font-semibold outline-none focus:border-[#DFA900]" />
+                        </label>
+                        <label>
+                          <span className="mb-1 block text-xs font-bold text-[#31513B]">Selling Price</span>
+                          <input type="number" min="0.01" step="0.01" value={item.sellingPrice} onChange={(event) => updateEditItem(index, "sellingPrice", event.target.value)} className="min-h-10 w-full rounded-lg border border-[#E6DEC3] px-3 py-2 text-sm font-semibold outline-none focus:border-[#DFA900]" />
+                        </label>
+                        <button type="button" onClick={() => setEditForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))} className="min-h-10 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-[#7B887E]">You can change quantity and selling price or remove an existing product. Stock will be recalculated when you save.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E6DEC3] bg-white px-4 py-3 sm:px-6">
+                <p className="text-xs text-[#7B887E]">Saving updates the bill and product stock together.</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={closeBillEditor} disabled={savingEdit} className="rounded-xl border border-[#D8CFB5] px-4 py-2.5 text-sm font-bold text-[#405247] hover:bg-[#F8F4E8]">Cancel</button>
+                  <button type="button" onClick={saveBillChanges} disabled={savingEdit} className={greenButtonClass}>{savingEdit ? "Saving..." : "Save Changes"}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* PRINT ALL CUSTOMER SALES REPORT */}
         <section className="sales-report-print fixed -left-[10000px] top-0 w-[190mm] bg-white p-0 text-black">
@@ -2605,6 +2864,7 @@ function Sales() {
                       <th className="text-left">#</th>
                       <th className="text-left">Product / Model</th>
                       <th className="text-left">Size / Type</th>
+                      <th className="text-left">Warranty</th>
                       <th className="text-right">Qty</th>
                       <th className="text-right">MRP</th>
                       <th className="text-right">Selling Price</th>
@@ -2621,6 +2881,7 @@ function Sales() {
                             .filter(Boolean)
                             .join(" / ") || "-"}
                         </td>
+                        <td className="font-semibold">{item.warranty || "-"}</td>
                         <td className="text-right">{Number(item.quantity || 0)}</td>
                         <td className="text-right">{money(item.mrp)}</td>
                         <td className="text-right">{money(item.sellingPrice)}</td>
@@ -2630,7 +2891,7 @@ function Sales() {
                       </tr>
                     ))}
                     {reportItems.length === 0 && (
-                      <tr><td colSpan={7} className="text-center">No product details stored for this bill.</td></tr>
+                      <tr><td colSpan={8} className="text-center">No product details stored for this bill.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -2639,9 +2900,9 @@ function Sales() {
                   <div><span>Subtotal</span><strong>{money(reportSubtotal)}</strong></div>
                   <div><span>Discount</span><strong>{money(bill.discount || 0)}</strong></div>
                   <div><span>GST</span><strong>{money(reportGst)}</strong></div>
-                  <div><strong>Grand Total</strong><strong>{money(getBillTotal(bill))}</strong></div>
-                  <div><span>Paid Amount</span><strong>{money(bill.paidAmount || 0)}</strong></div>
+                  <div className="rounded bg-[#FFF1B8] px-1 font-extrabold text-[#003B16]"><strong>Grand Total</strong><strong>{money(getBillTotal(bill))}</strong></div>
                   <div className="text-red-700"><strong>Balance Due</strong><strong>{money(getBillBalance(bill))}</strong></div>
+                  <div className="rounded text-sm bg-green-100 px-1 font-extrabold text-green-800"><strong>Paid Amount</strong><strong>{money(bill.paidAmount || 0)}</strong></div>
                 </div>
               </div>
             );
@@ -2926,6 +3187,7 @@ function BillTable({ bill, showGST = true }) {
               <th className="p-2.5">#</th>
               <th className="p-2.5">Product</th>
               <th className="p-2.5">Variant</th>
+              <th className="p-2.5">Warranty</th>
               <th className="p-2.5 text-center">Qty</th>
 
               
@@ -2966,6 +3228,7 @@ function BillTable({ bill, showGST = true }) {
                       .filter(Boolean)
                       .join(" / ") || "-"}
                   </td>
+                  <td className="p-2.5 font-semibold text-[#7A5A00]">{item.warranty || "-"}</td>
 
                   <td className="p-2.5 text-center">{quantity}</td>
 
@@ -2998,30 +3261,30 @@ function BillTable({ bill, showGST = true }) {
           {igst > 0 ? <div className="flex justify-between"><span>IGST</span><strong>{money(igst)}</strong></div> : <><div className="flex justify-between"><span>CGST</span><strong>{money(cgst)}</strong></div><div className="flex justify-between"><span>SGST</span><strong>{money(sgst)}</strong></div></>}</>}
         </div>
 
-        <div className="flex justify-between bg-gradient-to-r from-[#FFD75A] to-[#DFA900] px-3 py-2.5 text-base text-[#001F0B]">
-          <strong>Grand Total</strong>
-          <strong>{money(grandTotal)}</strong>
+        <div className="bill-grand-total flex justify-between items-center gap-3 border-y-2 border-[#B8860B] bg-gradient-to-r from-[#FFE082] to-[#DFA900] px-3 py-3 font-black text-[#001F0B] shadow-sm">
+          <strong className="bill-total-label">Grand Total</strong>
+          <strong className="bill-total-value tabular-nums">{money(grandTotal)}</strong>
         </div>
 
         <div className="space-y-2 bg-white/70 p-3">
-          <div className="flex justify-between">
-            <span>Paid Amount</span>
-            <strong>{money(paid)}</strong>
-          </div>
-
           <div className="flex justify-between text-[#B42318]">
             <strong>Balance Due</strong>
             <strong>{money(balance)}</strong>
+          </div>
+
+          <div className="bill-paid-amount flex items-center justify-between gap-3 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-green-800">
+            <strong className="bill-total-label">Paid Amount</strong>
+            <strong className="bill-total-value tabular-nums">{money(paid)}</strong>
           </div>
 
 
         </div>
       </div>
 
-      {/* Blank ruled space on the customer bill - owner writes warranty / notes by pen */}
+      {/* Additional customer notes space */}
       {(!showGST) && (
         <div className="mt-6 rounded-xl border border-dashed border-[#003B22] bg-white/60 px-4 pb-3 pt-3 text-xs">
-          <p className="font-bold text-[#003B22]">Warranty / Notes:</p>
+          <p className="font-bold text-[#003B22]">Additional Notes:</p>
 
           <div className="mt-7 border-b border-gray-400" />
           <div className="mt-7 border-b border-gray-400" />

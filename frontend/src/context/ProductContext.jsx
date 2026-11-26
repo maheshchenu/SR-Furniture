@@ -54,11 +54,6 @@ const mapProduct = (product) => ({
   ...product,
   id: product._id || product.id,
 
-  sizes: (product.sizes || []).map((size) => ({
-    ...size,
-    id: size._id || size.id,
-  })),
-  // Legacy variants remain mapped for old products and old bill history.
   variants: (product.variants || []).map((variant) => ({
     ...variant,
     id: variant._id || variant.id,
@@ -80,7 +75,6 @@ const mapSale = (sale) => ({
     id: item._id || item.id,
     productId: item.productId?._id || item.productId,
     variantId: item.variantId?._id || item.variantId,
-    sizeId: item.sizeId?._id || item.sizeId,
   })),
 
   payments: (sale.payments || []).map((payment) => ({
@@ -181,30 +175,9 @@ export function ProductProvider({ children }) {
     }
   };
 
-  // UPDATE PRODUCT (including direct stock quantity edits)
-  const updateProduct = async (productId, productData) => {
-    try {
-      const data = await apiRequest(`${PRODUCTS_API}/${productId}`, {
-        method: "PUT",
-        body: JSON.stringify(productData),
-      });
-
-      await refreshData();
-
-      return {
-        success: true,
-        message: data.message || "Product updated successfully.",
-        product: data.product ? mapProduct(data.product) : null,
-      };
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  };
-
   // ADD STOCK
   const addStock = async ({
     productId,
-    sizeId,
     variantId,
     quantity,
     date,
@@ -216,7 +189,6 @@ export function ProductProvider({ children }) {
           method: "POST",
           body: JSON.stringify({
             productId,
-            sizeId: sizeId || null,
             variantId: variantId || null,
             quantity: Number(quantity),
             date,
@@ -310,6 +282,28 @@ export function ProductProvider({ children }) {
         success: false,
         message: err.message,
       };
+    }
+  };
+
+  // UPDATE EXISTING BILL
+  const updateBill = async (billId, billData) => {
+    try {
+      const data = await apiRequest(`${SALES_API}/${billId}`, {
+        method: "PUT",
+        body: JSON.stringify(billData),
+      });
+
+      await refreshData();
+
+      const sale = data.sale ? mapSale(data.sale) : null;
+      return {
+        success: true,
+        message: data.message || "Bill updated successfully.",
+        sale,
+        bill: sale,
+      };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
   };
 
@@ -456,11 +450,11 @@ export function ProductProvider({ children }) {
         refreshData,
 
         addProduct,
-        updateProduct,
         addStock,
         deleteProduct,
 
         recordBill,
+        updateBill,
         recordSale,
         addPayment,
         deleteBill,

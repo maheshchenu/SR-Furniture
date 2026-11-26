@@ -1,9 +1,10 @@
+
 import { useMemo, useState } from "react";
 import { useCategories } from "../context/CategoryContext";
 import { useProducts } from "../context/ProductContext";
 
 /* ------------------------------------------------------------------ */
-/* UI-only styling helpers (no business logic)                         */
+/* UI-only styling helpers                                             */
 /* ------------------------------------------------------------------ */
 
 const focusRing =
@@ -15,12 +16,14 @@ const inputClass =
 const buttonClass =
   "group inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#DFA900] to-[#FFD75A] px-7 py-3 text-sm font-black text-[#001F0B] shadow-[0_10px_26px_-10px_rgba(223,169,0,.7)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-10px_rgba(223,169,0,.8)] active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#003B16] focus-visible:ring-offset-2";
 
-// Display-only: highlights the part of the name that matches the search text
+// Display-only search highlighting
 function HighlightMatch({ text, query }) {
   const q = query.trim();
+
   if (!q) return text;
 
   const index = text.toLowerCase().indexOf(q.toLowerCase());
+
   if (index === -1) return text;
 
   return (
@@ -38,10 +41,12 @@ function SkeletonCard() {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-[#EDE7D2] bg-white p-4">
       <div className="h-12 w-12 shrink-0 animate-pulse rounded-xl bg-[#EFEAD7]" />
+
       <div className="min-w-0 flex-1 space-y-2">
         <div className="h-3.5 w-2/3 animate-pulse rounded bg-[#EFEAD7]" />
         <div className="h-3 w-1/3 animate-pulse rounded bg-[#F5F1E2]" />
       </div>
+
       <div className="h-10 w-20 animate-pulse rounded-xl bg-[#F5F1E2]" />
     </div>
   );
@@ -50,14 +55,21 @@ function SkeletonCard() {
 function Categories() {
   const [categoryName, setCategoryName] = useState("");
   const [search, setSearch] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Edit states
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   const { refreshData } = useProducts();
 
   const {
     categories = [],
     addCategory,
+    updateCategory,
     deleteCategory,
     loading,
     error,
@@ -90,6 +102,7 @@ function Categories() {
       await addCategory(name);
 
       setCategoryName("");
+
       alert("Category added successfully!");
     } catch (error) {
       alert(error.message || "Failed to add category.");
@@ -105,6 +118,59 @@ function Categories() {
     );
   }, [categories, search]);
 
+  // Start Editing Category
+  const handleEdit = (category) => {
+    setEditingId(category.id);
+    setEditingName(category.name);
+  };
+
+  // Cancel Editing
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  // Update Category
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+
+    const name = editingName.trim();
+
+    if (!name) {
+      alert("Please enter category name.");
+      return;
+    }
+
+    const alreadyExists = categories.some(
+      (category) =>
+        category.id !== editingId &&
+        category.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      alert("Category already exists!");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+
+      await updateCategory(editingId, name);
+
+      // Refresh products because category name has changed
+      await refreshData();
+
+      setEditingId(null);
+      setEditingName("");
+
+      alert("Category updated successfully!");
+    } catch (error) {
+      alert(error.message || "Failed to update category.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   // Delete Category
   const handleDelete = async (category) => {
     const confirmed = window.confirm(
@@ -117,9 +183,17 @@ function Categories() {
       setDeletingId(category.id);
 
       const result = await deleteCategory(category.id);
+
       await refreshData();
 
-      alert(result.message || "Category and related products deleted successfully!");
+      if (editingId === category.id) {
+        handleCancelEdit();
+      }
+
+      alert(
+        result.message ||
+          "Category and related products deleted successfully!"
+      );
     } catch (error) {
       alert(error.message || "Failed to delete category.");
     } finally {
@@ -134,21 +208,30 @@ function Categories() {
           from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
         @keyframes cat-shine {
           from { transform: translateX(-150%); }
           to { transform: translateX(150%); }
         }
-        .cat-enter { animation: cat-enter .55s cubic-bezier(.2,.8,.2,1) both; }
+
+        .cat-enter {
+          animation: cat-enter .55s cubic-bezier(.2,.8,.2,1) both;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .cat-enter { animation: none !important; }
-          *, *::before, *::after { transition-duration: 0.01ms !important; }
+          *, *::before, *::after {
+            transition-duration: 0.01ms !important;
+          }
         }
       `}</style>
 
       {/* Page heading banner */}
       <header className="cat-enter relative isolate overflow-hidden rounded-[26px] bg-gradient-to-br from-[#003B16] via-[#002B11] to-[#001F0B] shadow-[0_22px_50px_-28px_rgba(0,31,11,.7)]">
         <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full border-[30px] border-white/[0.04]" />
+
         <div className="pointer-events-none absolute -bottom-32 right-[30%] h-64 w-64 rounded-full border-[26px] border-[#DFA900]/[0.09]" />
+
         <div className="pointer-events-none absolute right-10 top-6 h-40 w-40 rounded-full bg-[#DFA900]/10 blur-[70px]" />
 
         <div className="relative flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center sm:p-8">
@@ -167,7 +250,11 @@ function Categories() {
           </div>
 
           <div className="flex items-center gap-2.5 self-start rounded-2xl border border-[#FFD75A]/30 bg-white/[0.07] px-4 py-3 backdrop-blur-md">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#FFD75A] shadow-[0_0_10px_#FFD75A]" />
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-full bg-[#FFD75A] shadow-[0_0_10px_#FFD75A]"
+            />
+
             <span className="text-xs font-bold text-[#FFF8E1]">
               Category Management
             </span>
@@ -198,6 +285,7 @@ function Categories() {
           </div>
 
           <div className="absolute -right-6 -top-8 h-36 w-36 rounded-full border-[20px] border-white/10 transition-transform duration-500 group-hover:scale-110" />
+
           <div className="absolute bottom-0 left-0 h-[3px] w-full bg-gradient-to-r from-[#DFA900] to-[#FFD75A]" />
         </div>
 
@@ -220,6 +308,7 @@ function Categories() {
           </div>
 
           <div className="absolute -right-6 -top-8 h-36 w-36 rounded-full border-[20px] border-[#DFA900]/15 transition-transform duration-500 group-hover:scale-110" />
+
           <div className="absolute bottom-0 left-0 h-[3px] w-full bg-gradient-to-r from-[#003B16] to-[#4C9A5F]" />
         </div>
       </div>
@@ -240,7 +329,10 @@ function Categories() {
             </div>
 
             <div>
-              <h2 id="add-category-title" className="text-lg font-black text-[#003B16]">
+              <h2
+                id="add-category-title"
+                className="text-lg font-black text-[#003B16]"
+              >
                 Add New Category
               </h2>
 
@@ -293,7 +385,10 @@ function Categories() {
               </>
             ) : (
               <>
-                <span aria-hidden="true" className="text-lg leading-none transition-transform duration-300 group-hover:rotate-90">
+                <span
+                  aria-hidden="true"
+                  className="text-lg leading-none transition-transform duration-300 group-hover:rotate-90"
+                >
                   +
                 </span>
                 Add Category
@@ -313,7 +408,10 @@ function Categories() {
         <div className="border-b border-[#EFE9D4] bg-gradient-to-r from-[#FFFBEA] to-white p-5 sm:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="category-list-title" className="text-lg font-black text-[#003B16]">
+              <h2
+                id="category-list-title"
+                className="text-lg font-black text-[#003B16]"
+              >
                 Category List
               </h2>
 
@@ -360,6 +458,7 @@ function Categories() {
         {loading ? (
           <div className="p-4 sm:p-6" role="status" aria-live="polite">
             <span className="sr-only">Loading categories...</span>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((n) => (
                 <SkeletonCard key={n} />
@@ -410,9 +509,12 @@ function Categories() {
             {filteredCategories.map((category, index) => (
               <li
                 key={category.id}
-                className="cat-enter group relative flex min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[#EAE3CB] bg-[#FFFEFA] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[#DFA900]/70 hover:bg-[#FFFBEA] hover:shadow-[0_16px_30px_-20px_rgba(0,31,11,.5)]"
-                style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+                className="cat-enter group relative flex min-w-0 flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-[#EAE3CB] bg-[#FFFEFA] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[#DFA900]/70 hover:bg-[#FFFBEA] hover:shadow-[0_16px_30px_-20px_rgba(0,31,11,.5)]"
+                style={{
+                  animationDelay: `${Math.min(index, 8) * 45}ms`,
+                }}
               >
+                {/* Category Information */}
                 <div className="flex min-w-0 items-center gap-3.5">
                   <span
                     aria-hidden="true"
@@ -421,9 +523,15 @@ function Categories() {
                     {String(category.name).trim().charAt(0) || "•"}
                   </span>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-[#003B16]" title={category.name}>
-                      <HighlightMatch text={category.name} query={search} />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-sm font-black text-[#003B16]"
+                      title={category.name}
+                    >
+                      <HighlightMatch
+                        text={category.name}
+                        query={search}
+                      />
                     </p>
 
                     <p className="mt-1 text-[12px] font-medium text-[#6F7A6D]">
@@ -432,27 +540,117 @@ function Categories() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={deletingId === category.id}
-                  onClick={() => handleDelete(category)}
-                  aria-label={`Delete category ${category.name}`}
-                  className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border border-[#F3D3CB] bg-white px-3.5 py-2 text-xs font-extrabold text-[#B34A36] transition-all duration-200 hover:border-[#E8A898] hover:bg-[#FFF0EC] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                {/* Edit Form */}
+                {editingId === category.id && (
+                  <form
+                    onSubmit={handleUpdate}
+                    className="space-y-2"
                   >
-                    <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5" />
-                  </svg>
-                  {deletingId === category.id ? "Deleting..." : "Delete"}
-                </button>
+                    <label
+                      htmlFor={`edit-category-${category.id}`}
+                      className="text-xs font-bold text-[#003B16]"
+                    >
+                      Edit Category Name
+                    </label>
+
+                    <input
+                      id={`edit-category-${category.id}`}
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="w-full rounded-xl border border-[#DFA900] bg-white px-3 py-2.5 text-sm font-semibold text-[#003B16] outline-none focus:ring-2 focus:ring-[#DFA900]/30"
+                      autoFocus
+                      required
+                    />
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="submit"
+                        disabled={updating || !editingName.trim()}
+                        className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#003B16] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#005022] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {updating ? (
+                          <>
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        disabled={updating}
+                        className="inline-flex min-h-[38px] items-center justify-center rounded-xl border border-[#EAE3CB] bg-white px-4 py-2 text-xs font-extrabold text-[#6F7A6D] transition hover:bg-[#FFF8E1] disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Action Buttons */}
+                {editingId !== category.id && (
+                  <div className="flex items-center justify-end gap-2 border-t border-[#EFE9D4] pt-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(category)}
+                      disabled={
+                        editingId !== null ||
+                        updating ||
+                        deletingId !== null
+                      }
+                      aria-label={`Edit category ${category.name}`}
+                      className={`inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#EADFB5] bg-white px-3.5 py-2 text-xs font-extrabold text-[#8B6800] transition-all duration-200 hover:border-[#DFA900] hover:bg-[#FFF8E1] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                      </svg>
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={
+                        deletingId === category.id ||
+                        editingId !== null ||
+                        updating
+                      }
+                      onClick={() => handleDelete(category)}
+                      aria-label={`Delete category ${category.name}`}
+                      className={`inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#F3D3CB] bg-white px-3.5 py-2 text-xs font-extrabold text-[#B34A36] transition-all duration-200 hover:border-[#E8A898] hover:bg-[#FFF0EC] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5" />
+                      </svg>
+
+                      {deletingId === category.id
+                        ? "Deleting..."
+                        : "Delete"}
+                    </button>
+                  </div>
+                )}
 
                 <span className="pointer-events-none absolute bottom-0 left-0 h-[3px] w-0 bg-gradient-to-r from-[#DFA900] to-[#FFD75A] transition-all duration-500 group-hover:w-full" />
               </li>

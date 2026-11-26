@@ -22,6 +22,12 @@ const today = () => {
 const formatDate = (date) =>
   date ? new Date(date).toLocaleDateString("en-IN") : "-";
 
+const toDateInput = (date) => {
+  if (!date) return today();
+  const value = new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
 const inputClass =
   "w-full rounded-xl border border-[#E4D9C9] bg-white px-4 py-3 text-sm outline-none focus:border-[#A17C42] focus:ring-2 focus:ring-[#A17C42]/10";
 
@@ -196,6 +202,8 @@ function ManufacturerPayments() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [printSupplierOnly, setPrintSupplierOnly] = useState(false);
+  const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+  const [editingPaymentId, setEditingPaymentId] = useState(null);
 
   const [supplierForm, setSupplierForm] = useState({
     name: "",
@@ -349,6 +357,7 @@ function ManufacturerPayments() {
 
   const closePurchaseModal = () => {
     setShowPurchaseModal(false);
+    setEditingPurchaseId(null);
     setPurchaseForm({
       invoiceNumber: "",
       purchaseDate: today(),
@@ -363,6 +372,7 @@ function ManufacturerPayments() {
 
   const closePaymentModal = () => {
     setShowPaymentModal(false);
+    setEditingPaymentId(null);
     setPaymentForm({
       purchaseId: "",
       paymentDate: today(),
@@ -536,13 +546,167 @@ function ManufacturerPayments() {
     }
   };
 
+  /* ================= EDIT PURCHASE / PAYMENT ================= */
+
+  const openEditPurchase = (bill) => {
+    setEditingPurchaseId(bill.id);
+    setPurchaseForm({
+      invoiceNumber: bill.invoiceNumber || "",
+      purchaseDate: toDateInput(bill.purchaseDate),
+      amount: String(bill.amount ?? ""),
+      initialPaymentAmount: "",
+      paymentDate: today(),
+      paymentMode: "Cash",
+      reference: "",
+      notes: bill.notes || "",
+    });
+    setShowPurchaseModal(true);
+  };
+
+  const openEditPayment = (payment) => {
+    setEditingPaymentId(payment.id);
+    setPaymentForm({
+      purchaseId: payment.purchaseId || "",
+      paymentDate: toDateInput(payment.paymentDate),
+      amount: String(payment.amount ?? ""),
+      paymentMode: payment.paymentMode || "Cash",
+      reference: payment.reference || "",
+      notes: payment.notes || "",
+    });
+    setShowPaymentModal(true);
+  };
+
+  const updatePurchase = async (e) => {
+    e.preventDefault();
+    if (!selectedSupplier || !editingPurchaseId) return;
+
+    const totalAmount = Number(purchaseForm.amount);
+    const bill = selectedSupplier.purchases.find(
+      (item) => item.id === editingPurchaseId
+    );
+    const alreadyPaid = bill ? getBillSummary(bill).totalPaid : 0;
+
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      alert("Enter a valid purchase amount");
+      return;
+    }
+
+    if (totalAmount < alreadyPaid) {
+      alert(
+        `Purchase amount cannot be less than already paid amount (${money(alreadyPaid)})`
+      );
+      return;
+    }
+
+    if (!purchaseForm.purchaseDate) {
+      alert("Select purchase date");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiRequest(
+        `${API_URL}/${selectedSupplier.id}/purchases/${editingPurchaseId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            billNumber: purchaseForm.invoiceNumber.trim(),
+            purchaseDate: purchaseForm.purchaseDate,
+            totalAmount,
+            notes: purchaseForm.notes.trim(),
+          }),
+        }
+      );
+
+      await fetchSuppliers(selectedSupplier.id);
+      closePurchaseModal();
+      alert("Purchase bill updated successfully");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updatePayment = async (e) => {
+    e.preventDefault();
+    if (!selectedSupplier || !editingPaymentId) return;
+
+    const amount = Number(paymentForm.amount);
+    const bill = selectedSupplier.purchases.find(
+      (item) => item.id === paymentForm.purchaseId
+    );
+
+    if (!bill) {
+      alert("Purchase bill not found");
+      return;
+    }
+
+    const otherPayments = bill.payments
+      .filter((item) => item.id !== editingPaymentId)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Enter a valid payment amount");
+      return;
+    }
+
+    if (amount + otherPayments > bill.amount) {
+      alert(
+        `Payment amount cannot exceed bill balance available (${money(
+          bill.amount - otherPayments
+        )})`
+      );
+      return;
+    }
+
+    if (!paymentForm.paymentDate) {
+      alert("Select payment date");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiRequest(
+        `${API_URL}/${selectedSupplier.id}/purchases/${bill.id}/payments/${editingPaymentId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            amount,
+            paymentDate: paymentForm.paymentDate,
+            paymentMode: paymentForm.paymentMode,
+            reference: paymentForm.reference.trim(),
+            notes: paymentForm.notes.trim(),
+          }),
+        }
+      );
+
+      await fetchSuppliers(selectedSupplier.id);
+      closePaymentModal();
+      alert("Payment updated successfully");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   /* ================= DELETE SUPPLIER ================= */
+
   const deleteSupplier = async (supplier) => {
     const summary = getSummary(supplier);
-    const warning = summary.balance !== 0
-      ? `\nThis supplier has an outstanding balance of ${money(summary.balance)}.`
-      : "";
-    if (!window.confirm(`Delete supplier ${supplier.name}? This will delete supplier purchase/payment records too.${warning}`)) return;
+    const warning =
+      summary.balance !== 0
+        ? `\nThis supplier has an outstanding balance of ${money(summary.balance)}.`
+        : "";
+
+    if (
+      !window.confirm(
+        `Delete supplier ${supplier.name}? This will delete supplier purchase/payment records too.${warning}`
+      )
+    )
+      return;
+
     try {
       setSaving(true);
       await apiRequest(`${API_URL}/${supplier.id}`, { method: "DELETE" });
@@ -556,20 +720,79 @@ function ManufacturerPayments() {
   };
 
   /* ================= EXPORT / PRINT ================= */
+
   const exportSuppliersCSV = () => {
-    const rows = [["Supplier", "Phone", "Address", "Total Purchases", "Total Paid", "Balance", "Invoice", "Purchase Date", "Bill Amount", "Bill Paid", "Bill Balance"]];
+    const rows = [
+      [
+        "Supplier",
+        "Phone",
+        "Address",
+        "Total Purchases",
+        "Total Paid",
+        "Balance",
+        "Invoice",
+        "Purchase Date",
+        "Bill Amount",
+        "Bill Paid",
+        "Bill Balance",
+      ],
+    ];
+
     suppliers.forEach((supplier) => {
       const summary = getSummary(supplier);
-      if (!supplier.purchases.length) rows.push([supplier.name, supplier.phone, supplier.address, summary.totalPurchase, summary.totalPaid, summary.balance, "", "", "", "", ""]);
+
+      if (!supplier.purchases.length) {
+        rows.push([
+          supplier.name,
+          supplier.phone,
+          supplier.address,
+          summary.totalPurchase,
+          summary.totalPaid,
+          summary.balance,
+          "",
+          "",
+          "",
+          "",
+          "",
+        ]);
+      }
+
       supplier.purchases.forEach((bill) => {
         const billSummary = getBillSummary(bill);
-        rows.push([supplier.name, supplier.phone, supplier.address, summary.totalPurchase, summary.totalPaid, summary.balance, bill.invoiceNumber, formatDate(bill.purchaseDate), billSummary.totalPurchase, billSummary.totalPaid, billSummary.balance]);
+
+        rows.push([
+          supplier.name,
+          supplier.phone,
+          supplier.address,
+          summary.totalPurchase,
+          summary.totalPaid,
+          summary.balance,
+          bill.invoiceNumber,
+          formatDate(bill.purchaseDate),
+          billSummary.totalPurchase,
+          billSummary.totalPaid,
+          billSummary.balance,
+        ]);
       });
     });
-    const csv = rows.map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\r\n");
+
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "supplier_accounts.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "supplier_accounts.csv";
+    a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -596,7 +819,7 @@ function ManufacturerPayments() {
   /* ================= PAGE UI ================= */
 
   return (
-    <div className="min-h-screen bg-[#F7F5EF] p-4 sm:p-6 lg:p-8">
+    <div className="manufacturer-payments-page min-h-screen bg-[#F7F5EF] p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
 
         {/* HEADER */}
@@ -617,14 +840,31 @@ function ManufacturerPayments() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={exportSuppliersCSV} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Export Excel</button>
-            <button type="button" onClick={() => { setPrintSupplierOnly(false); window.print(); }} className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]">Print All A4</button>
-          <button
-            onClick={() => setShowSupplierModal(true)}
-            className="rounded-xl bg-[#5B3A29] px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-[#42291E]"
-          >
-            + Add Supplier
-          </button>
+            <button
+              type="button"
+              onClick={exportSuppliersCSV}
+              className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]"
+            >
+              Export Excel
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPrintSupplierOnly(false);
+                window.print();
+              }}
+              className="rounded-xl border border-[#D9C9B5] px-4 py-3 text-sm font-bold text-[#5B3A29]"
+            >
+              Print All A4
+            </button>
+
+            <button
+              onClick={() => setShowSupplierModal(true)}
+              className="rounded-xl bg-[#5B3A29] px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-[#42291E]"
+            >
+              + Add Supplier
+            </button>
           </div>
         </div>
 
@@ -726,37 +966,52 @@ function ManufacturerPayments() {
                   const active = selectedSupplierId === supplier.id;
 
                   return (
-                    <div key={supplier.id} className={`rounded-xl border p-3 ${active ? "border-[#A17C42] bg-[#F8F2E6]" : "border-transparent hover:bg-[#FAF8F3]"}`}>
-                    <button
-                      onClick={() => setSelectedSupplierId(supplier.id)}
-                      className="w-full p-1 text-left transition"
+                    <div
+                      key={supplier.id}
+                      className={`rounded-xl border p-3 ${
+                        active
+                          ? "border-[#A17C42] bg-[#F8F2E6]"
+                          : "border-transparent hover:bg-[#FAF8F3]"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#5B3A29] font-bold text-white">
-                          {supplier.name.charAt(0).toUpperCase()}
+                      <button
+                        onClick={() => setSelectedSupplierId(supplier.id)}
+                        className="w-full p-1 text-left transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#5B3A29] font-bold text-white">
+                            {supplier.name.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-bold text-[#34271D]">
+                              {supplier.name}
+                            </p>
+
+                            <p className="mt-1 text-xs text-[#817467]">
+                              {supplier.phone || "No phone number"}
+                            </p>
+                          </div>
+
+                          <span className="text-[#A17C42]">→</span>
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-[#34271D]">
-                            {supplier.name}
-                          </p>
-
-                          <p className="mt-1 text-xs text-[#817467]">
-                            {supplier.phone || "No phone number"}
-                          </p>
+                        <div className="mt-3 flex justify-between text-xs">
+                          <span className="text-[#817467]">Balance</span>
+                          <span className="font-bold text-red-600">
+                            {money(summary.balance)}
+                          </span>
                         </div>
+                      </button>
 
-                        <span className="text-[#A17C42]">→</span>
-                      </div>
-
-                      <div className="mt-3 flex justify-between text-xs">
-                        <span className="text-[#817467]">Balance</span>
-                        <span className="font-bold text-red-600">
-                          {money(summary.balance)}
-                        </span>
-                      </div>
-                    </button>
-                    <button type="button" onClick={() => deleteSupplier(supplier)} disabled={saving} className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Delete Supplier</button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSupplier(supplier)}
+                        disabled={saving}
+                        className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Delete Supplier
+                      </button>
                     </div>
                   );
                 })
@@ -820,7 +1075,9 @@ function ManufacturerPayments() {
                           </div>
                         </div>
 
-                        <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${statusClass(status)}`}>
+                        <span
+                          className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${statusClass(status)}`}
+                        >
                           {status}
                         </span>
                       </div>
@@ -923,7 +1180,7 @@ function ManufacturerPayments() {
                           </p>
                         ) : (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[650px] text-left text-sm">
+                            <table className="w-full min-w-[740px] text-left text-sm">
                               <thead className="bg-[#FAF8F3] text-xs text-[#817467]">
                                 <tr>
                                   <th className="px-5 py-3">Invoice</th>
@@ -931,6 +1188,7 @@ function ManufacturerPayments() {
                                   <th className="px-5 py-3">Amount</th>
                                   <th className="px-5 py-3">Paid</th>
                                   <th className="px-5 py-3">Balance</th>
+                                  <th className="px-5 py-3">Action</th>
                                 </tr>
                               </thead>
 
@@ -954,6 +1212,15 @@ function ManufacturerPayments() {
                                       </td>
                                       <td className="px-5 py-3 font-bold text-red-600">
                                         {money(billSummary.balance)}
+                                      </td>
+                                      <td className="px-5 py-3">
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditPurchase(bill)}
+                                          className="rounded-lg border border-[#D9C9B5] px-3 py-1.5 text-xs font-bold text-[#5B3A29] hover:bg-[#F8F5EF]"
+                                        >
+                                          Edit
+                                        </button>
                                       </td>
                                     </tr>
                                   );
@@ -1117,11 +1384,11 @@ function ManufacturerPayments() {
       {showPurchaseModal && selectedSupplier && (
         <Modal onClose={closePurchaseModal}>
           <form
-            onSubmit={addPurchase}
+            onSubmit={editingPurchaseId ? updatePurchase : addPurchase}
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
             <ModalHeader
-              title="Add Purchase Bill"
+              title={editingPurchaseId ? "Edit Purchase Bill" : "Add Purchase Bill"}
               subtitle={`Supplier: ${selectedSupplier.name}`}
               onClose={closePurchaseModal}
             />
@@ -1177,120 +1444,122 @@ function ManufacturerPayments() {
                 />
               </div>
 
-              <div className="space-y-4 rounded-xl border border-[#E8DFD1] p-4">
-                <div>
-                  <h3 className="font-bold text-[#34271D]">
-                    Initial Payment
-                  </h3>
-                  <p className="mt-1 text-xs text-[#817467]">
-                    Enter the amount paid now.
-                  </p>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Amount Paid</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={purchaseForm.initialPaymentAmount}
-                    onChange={(e) =>
-                      setPurchaseForm({
-                        ...purchaseForm,
-                        initialPaymentAmount: e.target.value,
-                      })
-                    }
-                    placeholder="Enter paid amount"
-                    className={inputClass}
-                  />
-                </div>
-
-                {purchasePaid > 0 && (
-                  <>
-                    <div>
-                      <label className={labelClass}>Payment Date *</label>
-                      <input
-                        required
-                        type="date"
-                        value={purchaseForm.paymentDate}
-                        onChange={(e) =>
-                          setPurchaseForm({
-                            ...purchaseForm,
-                            paymentDate: e.target.value,
-                          })
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>Payment Mode</label>
-                      <select
-                        value={purchaseForm.paymentMode}
-                        onChange={(e) =>
-                          setPurchaseForm({
-                            ...purchaseForm,
-                            paymentMode: e.target.value,
-                          })
-                        }
-                        className={inputClass}
-                      >
-                        <option>Cash</option>
-                        <option>UPI</option>
-                        <option>Bank Transfer</option>
-                        <option>Cheque</option>
-                        <option>Other</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>
-                        Transaction Reference
-                      </label>
-                      <input
-                        value={purchaseForm.reference}
-                        onChange={(e) =>
-                          setPurchaseForm({
-                            ...purchaseForm,
-                            reference: e.target.value,
-                          })
-                        }
-                        placeholder="Optional reference"
-                        className={inputClass}
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="space-y-3 rounded-xl bg-[#F8F5EF] p-4">
-                  <div className="flex justify-between gap-2 text-sm">
-                    <span className="text-[#817467]">Total Amount</span>
-                    <b className="text-[#34271D]">{money(purchaseTotal)}</b>
-                  </div>
-
-                  <div className="flex justify-between gap-2 text-sm">
-                    <span className="text-[#817467]">Amount Paid</span>
-                    <b className="text-green-700">{money(purchasePaid)}</b>
-                  </div>
-
-                  <div className="border-t border-[#E4D9C9] pt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-[#34271D]">
-                        Remaining Balance
-                      </span>
-                      <span className="text-xl font-bold text-red-600">
-                        {money(purchaseRemaining)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {purchasePaid > purchaseTotal && (
-                    <p className="text-xs font-semibold text-red-600">
-                      Paid amount cannot exceed purchase amount.
+              {!editingPurchaseId && (
+                <div className="space-y-4 rounded-xl border border-[#E8DFD1] p-4">
+                  <div>
+                    <h3 className="font-bold text-[#34271D]">
+                      Initial Payment
+                    </h3>
+                    <p className="mt-1 text-xs text-[#817467]">
+                      Enter the amount paid now.
                     </p>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Amount Paid</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={purchaseForm.initialPaymentAmount}
+                      onChange={(e) =>
+                        setPurchaseForm({
+                          ...purchaseForm,
+                          initialPaymentAmount: e.target.value,
+                        })
+                      }
+                      placeholder="Enter paid amount"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {purchasePaid > 0 && (
+                    <>
+                      <div>
+                        <label className={labelClass}>Payment Date *</label>
+                        <input
+                          required
+                          type="date"
+                          value={purchaseForm.paymentDate}
+                          onChange={(e) =>
+                            setPurchaseForm({
+                              ...purchaseForm,
+                              paymentDate: e.target.value,
+                            })
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Payment Mode</label>
+                        <select
+                          value={purchaseForm.paymentMode}
+                          onChange={(e) =>
+                            setPurchaseForm({
+                              ...purchaseForm,
+                              paymentMode: e.target.value,
+                            })
+                          }
+                          className={inputClass}
+                        >
+                          <option>Cash</option>
+                          <option>UPI</option>
+                          <option>Bank Transfer</option>
+                          <option>Cheque</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>
+                          Transaction Reference
+                        </label>
+                        <input
+                          value={purchaseForm.reference}
+                          onChange={(e) =>
+                            setPurchaseForm({
+                              ...purchaseForm,
+                              reference: e.target.value,
+                            })
+                          }
+                          placeholder="Optional reference"
+                          className={inputClass}
+                        />
+                      </div>
+                    </>
                   )}
+
+                  <div className="space-y-3 rounded-xl bg-[#F8F5EF] p-4">
+                    <div className="flex justify-between gap-2 text-sm">
+                      <span className="text-[#817467]">Total Amount</span>
+                      <b className="text-[#34271D]">{money(purchaseTotal)}</b>
+                    </div>
+
+                    <div className="flex justify-between gap-2 text-sm">
+                      <span className="text-[#817467]">Amount Paid</span>
+                      <b className="text-green-700">{money(purchasePaid)}</b>
+                    </div>
+
+                    <div className="border-t border-[#E4D9C9] pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-[#34271D]">
+                          Remaining Balance
+                        </span>
+                        <span className="text-xl font-bold text-red-600">
+                          {money(purchaseRemaining)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {purchasePaid > purchaseTotal && (
+                      <p className="text-xs font-semibold text-red-600">
+                        Paid amount cannot exceed purchase amount.
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className={labelClass}>Purchase Notes</label>
@@ -1311,7 +1580,13 @@ function ManufacturerPayments() {
 
             <ModalFooter
               onCancel={closePurchaseModal}
-              submitText={saving ? "Saving..." : "+ Save Purchase"}
+              submitText={
+                saving
+                  ? "Saving..."
+                  : editingPurchaseId
+                    ? "Update Purchase"
+                    : "+ Save Purchase"
+              }
             />
           </form>
         </Modal>
@@ -1322,11 +1597,15 @@ function ManufacturerPayments() {
       {showPaymentModal && selectedSupplier && (
         <Modal onClose={closePaymentModal}>
           <form
-            onSubmit={addPayment}
+            onSubmit={editingPaymentId ? updatePayment : addPayment}
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
             <ModalHeader
-              title="Record Supplier Payment"
+              title={
+                editingPaymentId
+                  ? "Edit Supplier Payment"
+                  : "Record Supplier Payment"
+              }
               subtitle={`Payment to ${selectedSupplier.name}`}
               onClose={closePaymentModal}
             />
@@ -1348,7 +1627,11 @@ function ManufacturerPayments() {
                 >
                   <option value="">Choose purchase bill</option>
                   {selectedSupplier.purchases
-                    .filter((bill) => getBillSummary(bill).balance > 0)
+                    .filter(
+                      (bill) =>
+                        getBillSummary(bill).balance > 0 ||
+                        bill.id === paymentForm.purchaseId
+                    )
                     .map((bill) => (
                       <option key={bill.id} value={bill.id}>
                         {bill.invoiceNumber || "Purchase"} - Balance:{" "}
@@ -1489,7 +1772,13 @@ function ManufacturerPayments() {
 
             <ModalFooter
               onCancel={closePaymentModal}
-              submitText={saving ? "Saving..." : "Save Payment"}
+              submitText={
+                saving
+                  ? "Saving..."
+                  : editingPaymentId
+                    ? "Update Payment"
+                    : "Save Payment"
+              }
             />
           </form>
         </Modal>
@@ -1562,9 +1851,18 @@ function ManufacturerPayments() {
                           </p>
                         </div>
 
-                        <p className="font-bold text-green-700">
-                          {money(payment.amount)}
-                        </p>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <p className="font-bold text-green-700">
+                            {money(payment.amount)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => openEditPayment(payment)}
+                            className="rounded-lg border border-[#D9C9B5] px-3 py-1.5 text-xs font-bold text-[#5B3A29] hover:bg-[#F8F5EF]"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </div>
 
                       {payment.reference && (
@@ -1594,15 +1892,21 @@ function ManufacturerPayments() {
           </div>
         </Modal>
       )}
+
+      {/* ================= SUPPLIER PRINT REPORT ================= */}
+
       <div className="supplier-print-report">
         <h1>
           {printSupplierOnly && selectedSupplier
             ? `${selectedSupplier.name} - Supplier Account Statement`
             : "Supplier Accounts Report"}
         </h1>
+
         {(() => {
           const reportSuppliers = printSupplierOnly
-            ? selectedSupplier ? [selectedSupplier] : []
+            ? selectedSupplier
+              ? [selectedSupplier]
+              : []
             : suppliers;
 
           return (
@@ -1621,6 +1925,7 @@ function ManufacturerPayments() {
                   <th>Bill Balance</th>
                 </tr>
               </thead>
+
               <tbody>
                 {reportSuppliers.flatMap((supplier) => {
                   const sum = getSummary(supplier);
@@ -1666,7 +1971,85 @@ function ManufacturerPayments() {
           );
         })()}
       </div>
-      <style>{`@media print { @page { size: A4 landscape; margin: 10mm; } body * { visibility: hidden !important; } .supplier-print-report, .supplier-print-report * { visibility: visible !important; } .supplier-print-report { display:block !important; position:absolute; inset:0; width:100%; color:#000; font-size:9pt; } .supplier-print-report h1 { font-size:16pt; margin-bottom:12px; } .supplier-print-report table { width:100%; border-collapse:collapse; } .supplier-print-report th,.supplier-print-report td { border:1px solid #555; padding:5px; text-align:left; } .supplier-print-report th { background:#eee !important; } } .supplier-print-report { display:none; }`}</style>
+
+      {/* ================= PAGE SCALING + PRINT CSS ================= */}
+
+      <style>{`
+        /*
+          Reduce rem-based Tailwind dimensions to 90%.
+          This reproduces the smaller appearance without CSS zoom.
+        */
+        html:has(.manufacturer-payments-page) {
+          font-size: 90%;
+        }
+
+        /* Adjust fixed pixel heights */
+        .manufacturer-payments-page .max-h-\\\\[550px\\\\] {
+          max-height: 495px;
+        }
+
+        .manufacturer-payments-page .min-h-\\\\[450px\\\\] {
+          min-height: 405px;
+        }
+
+        /* Keep the page width responsive */
+        @media screen {
+          .manufacturer-payments-page {
+            width: 100%;
+          }
+        }
+
+        /* Print layout remains at original print dimensions */
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .supplier-print-report,
+          .supplier-print-report * {
+            visibility: visible !important;
+          }
+
+          .supplier-print-report {
+            display: block !important;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            color: #000;
+            font-size: 9pt;
+          }
+
+          .supplier-print-report h1 {
+            font-size: 16pt;
+            margin-bottom: 12px;
+          }
+
+          .supplier-print-report table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          .supplier-print-report th,
+          .supplier-print-report td {
+            border: 1px solid #555;
+            padding: 5px;
+            text-align: left;
+          }
+
+          .supplier-print-report th {
+            background: #eee !important;
+          }
+        }
+
+        .supplier-print-report {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }

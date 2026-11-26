@@ -40,6 +40,12 @@ const billItemSchema = new mongoose.Schema(
       trim: true,
     },
 
+    warranty: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     quantity: {
       type: Number,
       required: true,
