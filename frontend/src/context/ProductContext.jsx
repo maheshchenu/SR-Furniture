@@ -54,9 +54,21 @@ const mapProduct = (product) => ({
   ...product,
   id: product._id || product.id,
 
+  // New stock structure: map MongoDB subdocument _id to the id
+  // consumed by Sales.jsx. Without this, sizeId becomes null at checkout.
+  sizes: (product.sizes || []).map((size) => ({
+    ...size,
+    id: size._id || size.id,
+  })),
+
+  // Keep legacy variants compatible with older product records.
   variants: (product.variants || []).map((variant) => ({
     ...variant,
     id: variant._id || variant.id,
+    sizes: (variant.sizes || []).map((size) => ({
+      ...size,
+      id: size._id || size.id,
+    })),
   })),
 
   stockHistory: (product.stockHistory || []).map((entry) => ({
@@ -74,7 +86,8 @@ const mapSale = (sale) => ({
     ...item,
     id: item._id || item.id,
     productId: item.productId?._id || item.productId,
-    variantId: item.variantId?._id || item.variantId,
+    sizeId: item.sizeId?._id || item.sizeId || null,
+    variantId: item.variantId?._id || item.variantId || null,
   })),
 
   payments: (sale.payments || []).map((payment) => ({

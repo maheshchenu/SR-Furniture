@@ -924,7 +924,12 @@ function Sales() {
 
       setStockWarning("");
       setMessage("Bill generated successfully! Sold items updated.");
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      // Wait for the generated-bill print panel to render, then bring it into view.
+      window.setTimeout(() => {
+        document
+          .getElementById("generated-bill-print-actions")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
     } catch (error) {
       setMessage(error.message || "Unable to generate bill. Please try again.");
     } finally {
@@ -1453,9 +1458,39 @@ function Sales() {
           }
 
           body.print-sales-report .sales-report-print > div:nth-child(2) {
-            margin-bottom: 4mm !important;
-            gap: 3mm !important;
-            font-size: 9pt !important;
+            margin-bottom: 3mm !important;
+            font-size: 8pt !important;
+          }
+
+          body.print-sales-report .sales-report-summary {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 5mm !important;
+            width: 100% !important;
+            padding: 1.5mm 0 !important;
+            border-top: 1px solid #777 !important;
+            border-bottom: 1px solid #777 !important;
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
+          }
+
+          body.print-sales-report .sales-report-summary > div {
+            display: inline-flex !important;
+            align-items: baseline !important;
+            gap: 1.5mm !important;
+            white-space: nowrap !important;
+          }
+
+          body.print-sales-report .sales-report-summary span {
+            color: #555 !important;
+            font-size: 7.5pt !important;
+          }
+
+          body.print-sales-report .sales-report-summary strong {
+            font-size: 8.5pt !important;
+            font-weight: 800 !important;
           }
 
           body.print-sales-report .sales-report-print img {
@@ -1515,54 +1550,62 @@ function Sales() {
           }
 
           body.print-sales-report .sales-report-totals {
-            display: grid !important;
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: baseline !important;
+            justify-content: space-between !important;
             width: 100% !important;
-            margin: 2mm 0 0 !important;
-            gap: 2mm !important;
-            font-size: 8pt !important;
-            line-height: 1.25 !important;
+            margin: 1.5mm 0 0 !important;
+            gap: 2.5mm !important;
+            font-size: 7.2pt !important;
+            line-height: 1.15 !important;
+            white-space: nowrap !important;
           }
 
           body.print-sales-report .sales-report-totals > div {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            gap: 2mm !important;
-            white-space: normal !important;
-            overflow: visible !important;
+            display: inline-flex !important;
+            flex: 0 1 auto !important;
+            align-items: baseline !important;
+            justify-content: flex-start !important;
+            gap: 1mm !important;
             min-width: 0 !important;
-            border: 1px solid #ccc !important;
-            border-radius: 2px !important;
-            padding: 2mm !important;
-          }
-
-          body.print-sales-report .sales-report-totals > div strong:last-child {
+            padding: 0 !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            color: #333 !important;
+            font-size: 7.2pt !important;
             white-space: nowrap !important;
-            overflow: visible !important;
-            text-align: right !important;
-            font-variant-numeric: tabular-nums !important;
           }
 
-          body.print-sales-report .sales-report-totals > div:nth-child(4),
-          body.print-sales-report .sales-report-totals > div:nth-child(6) {
-            min-height: 10mm !important;
-            align-items: center !important;
-            font-size: 10pt !important;
-            font-weight: 800 !important;
-            border: 1.5px solid currentColor !important;
-            padding: 2.5mm !important;
+          body.print-sales-report .sales-report-totals > div strong {
+            font-size: inherit !important;
+            font-weight: 700 !important;
+            white-space: nowrap !important;
           }
 
-          body.print-sales-report .sales-report-totals > div:nth-child(4) strong,
-          body.print-sales-report .sales-report-totals > div:nth-child(6) strong {
-            font-size: 10pt !important;
+          body.print-sales-report .sales-report-totals > div.sales-report-grand,
+          body.print-sales-report .sales-report-totals > div.sales-report-paid {
+            color: #003B16 !important;
+            font-size: 9pt !important;
             font-weight: 900 !important;
           }
 
-          body.print-sales-report .sales-report-totals > div:nth-child(4) strong:last-child,
-          body.print-sales-report .sales-report-totals > div:nth-child(6) strong:last-child {
-            font-size: 11pt !important;
+          body.print-sales-report .sales-report-totals > div.sales-report-grand strong,
+          body.print-sales-report .sales-report-totals > div.sales-report-paid strong {
+            font-size: 9pt !important;
+            font-weight: 900 !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div.sales-report-grand strong:last-child,
+          body.print-sales-report .sales-report-totals > div.sales-report-paid strong:last-child {
+            font-size: 10pt !important;
+          }
+
+          body.print-sales-report .sales-report-totals > div.sales-report-balance {
+            color: #B42318 !important;
+            font-size: 7.2pt !important;
           }
 
           body.print-sales-report .sales-report-bill .mt-2 {
@@ -2804,19 +2847,10 @@ function Sales() {
             </div>
           </div>
 
-          <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
-            <div className="border border-gray-400 p-2">
-              <p className="text-xs text-gray-600">Total Bills</p>
-              <p className="font-bold">{sortedSales.length}</p>
-            </div>
-            <div className="border border-gray-400 p-2">
-              <p className="text-xs text-gray-600">Total Sales</p>
-              <p className="font-bold">{money(sortedSales.reduce((sum, bill) => sum + getBillTotal(bill), 0))}</p>
-            </div>
-            <div className="border border-gray-400 p-2">
-              <p className="text-xs text-gray-600">Total Pending</p>
-              <p className="font-bold">{money(sortedSales.reduce((sum, bill) => sum + getBillBalance(bill), 0))}</p>
-            </div>
+          <div className="sales-report-summary mb-4">
+            <div><span>Total Bills</span><strong>{sortedSales.length}</strong></div>
+            <div><span>Total Sales</span><strong>{money(sortedSales.reduce((sum, bill) => sum + getBillTotal(bill), 0))}</strong></div>
+            <div><span>Total Pending</span><strong>{money(sortedSales.reduce((sum, bill) => sum + getBillBalance(bill), 0))}</strong></div>
           </div>
 
           {sortedSales.map((bill, billIndex) => {
@@ -2896,13 +2930,13 @@ function Sales() {
                   </tbody>
                 </table>
 
-                <div className="sales-report-totals mt-2 grid grid-cols-6 gap-2 text-[7px]">
+                <div className="sales-report-totals mt-2">
                   <div><span>Subtotal</span><strong>{money(reportSubtotal)}</strong></div>
                   <div><span>Discount</span><strong>{money(bill.discount || 0)}</strong></div>
                   <div><span>GST</span><strong>{money(reportGst)}</strong></div>
-                  <div className="rounded bg-[#FFF1B8] px-1 font-extrabold text-[#003B16]"><strong>Grand Total</strong><strong>{money(getBillTotal(bill))}</strong></div>
-                  <div className="text-red-700"><strong>Balance Due</strong><strong>{money(getBillBalance(bill))}</strong></div>
-                  <div className="rounded text-sm bg-green-100 px-1 font-extrabold text-green-800"><strong>Paid Amount</strong><strong>{money(bill.paidAmount || 0)}</strong></div>
+                  <div className="sales-report-grand"><strong>Grand Total</strong><strong>{money(getBillTotal(bill))}</strong></div>
+                  <div className="sales-report-balance"><strong>Balance Due</strong><strong>{money(getBillBalance(bill))}</strong></div>
+                  <div className="sales-report-paid"><strong>Paid Amount</strong><strong>{money(bill.paidAmount || 0)}</strong></div>
                 </div>
               </div>
             );
@@ -2931,6 +2965,7 @@ function Sales() {
             </section>
 
             <div
+              id="generated-bill-print-actions"
               className={`no-print sales-enter overflow-hidden ${cardClass} ring-1 ring-[#DFA900]/30`}
             >
               <div className="flex flex-col gap-5 bg-gradient-to-r from-[#FFF8E1] to-[#FFFDF5] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">

@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -142,10 +143,13 @@ const textOf = (node) => {
   if (node === null || node === undefined || typeof node === "boolean") {
     return "";
   }
+
   if (typeof node === "string" || typeof node === "number") {
     return String(node);
   }
+
   if (Array.isArray(node)) return node.map(textOf).join("");
+
   return textOf(node.props?.children);
 };
 
@@ -189,12 +193,14 @@ function SelectField({ children, value, onChange, disabled }) {
 
   const openMenu = () => {
     if (disabled) return;
+
     setActive(Math.max(0, options.findIndex((o) => o.value === current)));
     setOpen(true);
   };
 
   const choose = (option) => {
     if (!option) return;
+
     onChange?.({ target: { value: option.value } });
     setOpen(false);
     buttonRef.current?.focus();
@@ -212,6 +218,7 @@ function SelectField({ children, value, onChange, disabled }) {
       ) {
         return;
       }
+
       setOpen(false);
     };
 
@@ -228,6 +235,7 @@ function SelectField({ children, value, onChange, disabled }) {
 
   useEffect(() => {
     if (!open) return;
+
     menuRef.current
       ?.querySelector('[data-active="true"]')
       ?.scrollIntoView({ block: "nearest" });
@@ -236,10 +244,12 @@ function SelectField({ children, value, onChange, disabled }) {
   const handleKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
+
       if (!open) openMenu();
       else setActive((i) => Math.min(i + 1, options.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+
       if (!open) openMenu();
       else setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter" && open) {
@@ -623,22 +633,49 @@ function Expenses() {
       ]),
       ["", "", "", "Filtered Total", filteredTotal],
     ];
-    const csv = rows.map((row) => row.map((value) => {
-      const text = String(value ?? "");
-      return `\"${text.replace(/\"/g, '""')}\"`;
-    }).join(",")).join("\r\n");
-    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8;" });
+
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => {
+            const text = String(value ?? "");
+            return `"${text.replace(/"/g, '""')}"`;
+          })
+          .join(",")
+      )
+      .join("\r\n");
+
+    const blob = new Blob(["\ufeff", csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `expenses_${getTodayDate()}.csv`;
+
     document.body.appendChild(link);
     link.click();
     link.remove();
+
     URL.revokeObjectURL(url);
   };
 
-  const printExpenses = () => window.print();
+  // PRINT A4
+  const printExpenses = () => {
+    window.print();
+  };
+
+  // PRINT ORDER: OLDEST FIRST, LATEST LAST
+  const printFilteredExpenses = useMemo(() => {
+    return [...filteredExpenses].sort((a, b) => {
+      const dateA = getDateOnly(a.date);
+      const dateB = getDateOnly(b.date);
+
+      return dateA.localeCompare(dateB);
+    });
+  }, [filteredExpenses]);
 
   const statCards = [
     {
@@ -864,7 +901,11 @@ function Expenses() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4F24] to-[#001F0B] text-[#FFD75A] shadow-md ring-1 ring-[#DFA900]/40">
-                        <Icon name={editingId ? "edit" : "plus"} className="h-6 w-6" strokeWidth={2.5} />
+                        <Icon
+                          name={editingId ? "edit" : "plus"}
+                          className="h-6 w-6"
+                          strokeWidth={2.5}
+                        />
                       </div>
 
                       <div>
@@ -1159,11 +1200,23 @@ function Expenses() {
                     <span className="rounded-full border border-[#DFA900]/40 bg-[#FFF1C2] px-4 py-2 text-xs font-extrabold text-[#7A5A00]">
                       {filteredExpenses.length} Records
                     </span>
-                    <button type="button" onClick={exportToExcel} className={ghostButtonClass}>
-                      <Icon name="stack" className="h-4 w-4" /> Export Excel
+
+                    <button
+                      type="button"
+                      onClick={exportToExcel}
+                      className={ghostButtonClass}
+                    >
+                      <Icon name="stack" className="h-4 w-4" />
+                      Export Excel
                     </button>
-                    <button type="button" onClick={printExpenses} className={greenButtonClass}>
-                      <Icon name="calendar" className="h-4 w-4" /> Print A4
+
+                    <button
+                      type="button"
+                      onClick={printExpenses}
+                      className={greenButtonClass}
+                    >
+                      <Icon name="calendar" className="h-4 w-4" />
+                      Print A4
                     </button>
                   </div>
                 </div>
@@ -1405,29 +1458,127 @@ function Expenses() {
           </>
         )}
       </div>
+
+      {/* PRINT CSS */}
       <style>{`
-        .expense-print-report { display: none; }
+        .expense-print-report {
+          display: none;
+        }
+
         @media print {
-          @page { size: A4 portrait; margin: 12mm; }
-          body { background: white !important; }
-          body * { visibility: hidden !important; }
-          .expense-print-report, .expense-print-report * { visibility: visible !important; }
-          .expense-print-report { display: block !important; position: absolute; inset: 0; width: 100%; color: #111; font-family: Arial, sans-serif; }
-          .expense-print-report table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-          .expense-print-report th, .expense-print-report td { border: 1px solid #555; padding: 6px; text-align: left; word-break: break-word; }
-          .expense-print-report th { background: #eee !important; }
+          @page {
+            size: A4 portrait;
+            margin: 12mm;
+          }
+
+          body {
+            background: white !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .expense-print-report,
+          .expense-print-report * {
+            visibility: visible !important;
+          }
+
+          .expense-print-report {
+            display: block !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            color: #111;
+            font-family: Arial, sans-serif;
+          }
+
+          .expense-print-report table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+          }
+
+          .expense-print-report th,
+          .expense-print-report td {
+            border: 1px solid #555;
+            padding: 6px;
+            text-align: left;
+            word-break: break-word;
+          }
+
+          .expense-print-report th {
+            background: #eee !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+
+          .expense-print-report h1 {
+            font-size: 20px;
+            margin-bottom: 4px;
+          }
+
+          .expense-print-report h2 {
+            font-size: 16px;
+            margin-top: 0;
+          }
+
+          .expense-print-report tfoot {
+            font-weight: bold;
+          }
         }
       `}</style>
+
+      {/* A4 PRINT REPORT */}
       <div className="expense-print-report">
-        <h1 style={{ textAlign: "center", marginBottom: 4 }}>SR Sofas & Furniture</h1>
-        <h2 style={{ textAlign: "center", marginTop: 0 }}>Expense Report</h2>
-        <p>Printed: {new Date().toLocaleDateString("en-IN")} | Records: {filteredExpenses.length}</p>
+        <h1 style={{ textAlign: "center", marginBottom: 4 }}>
+          SR Sofas & Furniture
+        </h1>
+
+        <h2 style={{ textAlign: "center", marginTop: 0 }}>
+          Expense Report
+        </h2>
+
+        <p>
+          Printed: {new Date().toLocaleDateString("en-IN")}
+          {" | "}
+          Records: {printFilteredExpenses.length}
+        </p>
+
         <table>
-          <thead><tr><th>Expense Name</th><th>Date</th><th>Payment Method</th><th>Note</th><th>Amount (₹)</th></tr></thead>
-          <tbody>{filteredExpenses.map((expense) => (
-            <tr key={expense.id}><td>{expense.title}</td><td>{formatRowDate(expense)}</td><td>{expense.paymentMethod || "-"}</td><td>{expense.note || "-"}</td><td>{Number(expense.amount || 0).toLocaleString("en-IN")}</td></tr>
-          ))}</tbody>
-          <tfoot><tr><th colSpan="4" style={{ textAlign: "right" }}>Filtered Total</th><th>{formatINR(filteredTotal)}</th></tr></tfoot>
+          <thead>
+            <tr>
+              <th>Expense Name</th>
+              <th>Date</th>
+              <th>Payment Method</th>
+              <th>Note</th>
+              <th>Amount (₹)</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {printFilteredExpenses.map((expense) => (
+              <tr key={expense.id}>
+                <td>{expense.title}</td>
+                <td>{formatRowDate(expense)}</td>
+                <td>{expense.paymentMethod || "-"}</td>
+                <td>{expense.note || "-"}</td>
+                <td>
+                  {Number(expense.amount || 0).toLocaleString("en-IN")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+
+          <tfoot>
+            <tr>
+              <th colSpan="4" style={{ textAlign: "right" }}>
+                Filtered Total
+              </th>
+              <th>{formatINR(filteredTotal)}</th>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
