@@ -530,6 +530,26 @@ function Sales() {
     );
   }, [sales]);
 
+  // Print report in chronological order: oldest bill date first, newest last.
+  // The sales history screen keeps its existing newest-first order.
+  const chronologicalSales = useMemo(() => {
+    return [...sales].sort((a, b) => {
+      const dateA = getBillDateKey(a);
+      const dateB = getBillDateKey(b);
+
+      if (dateA !== dateB) {
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA.localeCompare(dateB);
+      }
+
+      return (
+        new Date(a.createdAt || a.date || 0).getTime() -
+        new Date(b.createdAt || b.date || 0).getTime()
+      );
+    });
+  }, [sales]);
+
   const totalSoldItems = useMemo(
     () =>
       sales.reduce(
@@ -1056,7 +1076,7 @@ function Sales() {
 
   // Print every customer bill and every product in the sales history.
   const printAllSalesReport = () => {
-    if (!sortedSales.length) {
+    if (!chronologicalSales.length) {
       setMessage("There are no sales bills available to print.");
       return;
     }
@@ -2765,18 +2785,18 @@ function Sales() {
               <div className="text-right">
                 <h2 className="text-lg font-extrabold">SALES REPORT</h2>
                 <p className="text-xs">Printed: {new Date().toLocaleDateString("en-IN")}</p>
-                <p className="text-xs">Total Bills: {sortedSales.length}</p>
+                <p className="text-xs">Total Bills: {chronologicalSales.length}</p>
               </div>
             </div>
           </div>
 
           <div className="sales-report-summary mb-4">
-            <div><span>Total Bills</span><strong>{sortedSales.length}</strong></div>
-            <div><span>Total Sales</span><strong>{money(sortedSales.reduce((sum, bill) => sum + getBillTotal(bill), 0))}</strong></div>
-            <div><span>Total Pending</span><strong>{money(sortedSales.reduce((sum, bill) => sum + getBillBalance(bill), 0))}</strong></div>
+            <div><span>Total Bills</span><strong>{chronologicalSales.length}</strong></div>
+            <div><span>Total Sales</span><strong>{money(chronologicalSales.reduce((sum, bill) => sum + getBillTotal(bill), 0))}</strong></div>
+            <div><span>Total Pending</span><strong>{money(chronologicalSales.reduce((sum, bill) => sum + getBillBalance(bill), 0))}</strong></div>
           </div>
 
-          {sortedSales.map((bill, billIndex) => {
+          {chronologicalSales.map((bill, billIndex) => {
             const reportItems = Array.isArray(bill.items) ? bill.items : [];
             const reportSubtotal = Number(
               bill.subtotal ??
