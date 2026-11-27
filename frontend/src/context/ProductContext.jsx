@@ -37,7 +37,6 @@ const apiRequest = async (url, options = {}) => {
     }
 
     return data;
-
   } catch (error) {
     console.error("API Request Error:", error);
 
@@ -54,14 +53,13 @@ const mapProduct = (product) => ({
   ...product,
   id: product._id || product.id,
 
-  // New stock structure: map MongoDB subdocument _id to the id
-  // consumed by Sales.jsx. Without this, sizeId becomes null at checkout.
+  // New Size/Type structure
   sizes: (product.sizes || []).map((size) => ({
     ...size,
     id: size._id || size.id,
   })),
 
-  // Keep legacy variants compatible with older product records.
+  // Legacy variants compatibility
   variants: (product.variants || []).map((variant) => ({
     ...variant,
     id: variant._id || variant.id,
@@ -71,6 +69,7 @@ const mapProduct = (product) => ({
     })),
   })),
 
+  // Stock history
   stockHistory: (product.stockHistory || []).map((entry) => ({
     ...entry,
     id: entry._id || entry.id,
@@ -110,7 +109,7 @@ export function ProductProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // FETCH PRODUCTS, SALES AND EXPENSES INDEPENDENTLY
+  // FETCH PRODUCTS, SALES AND EXPENSES
   const refreshData = useCallback(async () => {
     const errors = [];
 
@@ -154,7 +153,9 @@ export function ProductProvider({ children }) {
       success: !errors.some((message) =>
         message.startsWith("Products:")
       ),
-      message: errors.join(" | ") || "Data refreshed successfully.",
+      message:
+        errors.join(" | ") ||
+        "Data refreshed successfully.",
     };
   }, []);
 
@@ -175,7 +176,41 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Product added successfully.",
+        message:
+          data.message || "Product added successfully.",
+        product: data.product
+          ? mapProduct(data.product)
+          : null,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.message,
+      };
+    }
+  };
+
+  // UPDATE PRODUCT
+  const updateProduct = async (productId, productData) => {
+    try {
+      if (!productId) {
+        throw new Error("Product ID is missing.");
+      }
+
+      const data = await apiRequest(
+        `${PRODUCTS_API}/${productId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(productData),
+        }
+      );
+
+      await refreshData();
+
+      return {
+        success: true,
+        message:
+          data.message || "Product updated successfully.",
         product: data.product
           ? mapProduct(data.product)
           : null,
@@ -191,6 +226,7 @@ export function ProductProvider({ children }) {
   // ADD STOCK
   const addStock = async ({
     productId,
+    sizeId,
     variantId,
     quantity,
     date,
@@ -202,6 +238,7 @@ export function ProductProvider({ children }) {
           method: "POST",
           body: JSON.stringify({
             productId,
+            sizeId: sizeId || null,
             variantId: variantId || null,
             quantity: Number(quantity),
             date,
@@ -213,7 +250,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Stock updated successfully.",
+        message:
+          data.message || "Stock updated successfully.",
         product: data.product
           ? mapProduct(data.product)
           : null,
@@ -240,7 +278,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Product deleted successfully.",
+        message:
+          data.message || "Product deleted successfully.",
       };
     } catch (err) {
       return {
@@ -286,7 +325,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Bill created successfully.",
+        message:
+          data.message || "Bill created successfully.",
         sale,
         bill: sale,
       };
@@ -301,22 +341,32 @@ export function ProductProvider({ children }) {
   // UPDATE EXISTING BILL
   const updateBill = async (billId, billData) => {
     try {
-      const data = await apiRequest(`${SALES_API}/${billId}`, {
-        method: "PUT",
-        body: JSON.stringify(billData),
-      });
+      const data = await apiRequest(
+        `${SALES_API}/${billId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(billData),
+        }
+      );
 
       await refreshData();
 
-      const sale = data.sale ? mapSale(data.sale) : null;
+      const sale = data.sale
+        ? mapSale(data.sale)
+        : null;
+
       return {
         success: true,
-        message: data.message || "Bill updated successfully.",
+        message:
+          data.message || "Bill updated successfully.",
         sale,
         bill: sale,
       };
     } catch (err) {
-      return { success: false, message: err.message };
+      return {
+        success: false,
+        message: err.message,
+      };
     }
   };
 
@@ -351,7 +401,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Payment added successfully.",
+        message:
+          data.message || "Payment added successfully.",
         sale,
         bill: sale,
       };
@@ -363,14 +414,29 @@ export function ProductProvider({ children }) {
     }
   };
 
-  // PERMANENTLY DELETE BILL (stock is intentionally untouched)
+  // PERMANENTLY DELETE BILL
+  // Stock is intentionally untouched
   const deleteBill = async (billId) => {
     try {
-      const data = await apiRequest(`${SALES_API}/${billId}`, { method: "DELETE" });
+      const data = await apiRequest(
+        `${SALES_API}/${billId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
       await refreshData();
-      return { success: true, message: data.message || "Bill permanently deleted." };
+
+      return {
+        success: true,
+        message:
+          data.message || "Bill permanently deleted.",
+      };
     } catch (err) {
-      return { success: false, message: err.message };
+      return {
+        success: false,
+        message: err.message,
+      };
     }
   };
 
@@ -386,7 +452,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Expense added successfully.",
+        message:
+          data.message || "Expense added successfully.",
         expense: data.expense
           ? mapExpense(data.expense)
           : null,
@@ -414,7 +481,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Expense updated successfully.",
+        message:
+          data.message || "Expense updated successfully.",
         expense: data.expense
           ? mapExpense(data.expense)
           : null,
@@ -441,7 +509,8 @@ export function ProductProvider({ children }) {
 
       return {
         success: true,
-        message: data.message || "Expense deleted successfully.",
+        message:
+          data.message || "Expense deleted successfully.",
       };
     } catch (err) {
       return {
@@ -463,6 +532,7 @@ export function ProductProvider({ children }) {
         refreshData,
 
         addProduct,
+        updateProduct,
         addStock,
         deleteProduct,
 
